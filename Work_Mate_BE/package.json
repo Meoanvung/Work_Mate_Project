@@ -1,0 +1,30 @@
+{
+  "name": "workmate-be",
+  "version": "1.0.0",
+  "description": "WorkMate Backend - Signup with email OTP verification, JWT and salted-hashed passwords on MongoDB",
+  "main": "src/server.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node tests/auth.e2e.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "nodemailer": "^10.6.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.9"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.3",
+    "nodemon": "^3.1.9"
+  }
+}
