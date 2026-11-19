@@ -1,9 +1,11 @@
 package com.example.tempapp.auth.signup
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.example.tempapp.main.home.HomeActivity
 import com.example.tempapp.ui.theme.TempAppTheme
 
 class SignUpActivity : ComponentActivity() {
@@ -15,7 +17,14 @@ class SignUpActivity : ComponentActivity() {
                 SignUpScreen(
                     onBackClick = { finish() },
                     onSignInClick = { finish() },
-                    onSignUpClick = { /* Registration API integration will be added later. */ }
+                    onSignUpClick = {
+                        startActivity(
+                            Intent(this@SignUpActivity, HomeActivity::class.java).apply {
+                                putExtra(HomeActivity.EXTRA_SHOW_WELCOME, true)
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }
+                        )
+                    }
                 )
             }
         }
