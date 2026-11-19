@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.tempapp.MainActivity
+import com.example.tempapp.auth.signup.SignUpActivity
 import com.example.tempapp.ui.theme.TempAppTheme
 
 class OnboardActivity : ComponentActivity() {
@@ -19,6 +20,9 @@ class OnboardActivity : ComponentActivity() {
                         val intent = Intent(this@OnboardActivity, MainActivity::class.java)
                         startActivity(intent)
                         finish()
+                    },
+                    onSignUpClick = {
+                        startActivity(Intent(this@OnboardActivity, SignUpActivity::class.java))
                     }
                 )
             }
