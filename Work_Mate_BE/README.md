@@ -53,7 +53,7 @@ Server chạy tại `http://localhost:5000`. Health check: `GET /api/health`.
 npm test
 ```
 
-Chạy E2E thật với MongoDB ảo: signup → OTP sai → OTP đúng → lấy JWT → gọi `/me` → login → chặn trùng email.
+Chạy E2E thật với MongoDB ảo: signup → OTP sai → OTP đúng → lấy JWT → gọi `/me` → login bằng email/số điện thoại → chặn trùng email/số điện thoại.
 
 ---
 
@@ -94,9 +94,9 @@ Gửi lại OTP (chỉ khi tài khoản chưa xác thực).
 
 ### `POST /api/auth/login`
 ```json
-{ "email": "user@example.com", "password": "Password123" }
+{ "identifier": "user@example.com", "password": "Password123" }
 ```
-Chỉ cho phép đăng nhập khi email **đã xác thực**. Response chứa JWT.
+`identifier` có thể là email hoặc số điện thoại (ví dụ: `+84901234567`). Số điện thoại được chuẩn hóa bằng cách bỏ khoảng trắng, ngoặc, dấu chấm và gạch nối trước khi tra MongoDB. Chỉ cho phép đăng nhập khi email **đã xác thực**. Response chứa JWT; sai identifier hoặc mật khẩu trả về `401` với thông báo chung.
 
 ### `GET /api/auth/me` 🔒
 Header: `Authorization: Bearer <JWT>` → trả về thông tin user.

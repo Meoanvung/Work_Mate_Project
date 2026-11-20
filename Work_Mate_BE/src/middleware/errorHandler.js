@@ -6,9 +6,15 @@ export function notFound(req, res) {
 export function errorHandler(err, req, res, next) {
   console.error('[error]', err);
 
-  // Mongo duplicate key (e.g. email unique index)
+  // Mongo duplicate key (e.g. email or phoneNumber unique index)
   if (err?.code === 11000) {
-    return res.status(409).json({ success: false, message: 'Dữ liệu đã tồn tại (email trùng lặp).' });
+    if (err.keyPattern?.phoneNumber || err.keyValue?.phoneNumber) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại đã được đăng ký.' });
+    }
+    if (err.keyPattern?.email || err.keyValue?.email) {
+      return res.status(409).json({ success: false, message: 'Email đã được đăng ký.' });
+    }
+    return res.status(409).json({ success: false, message: 'Dữ liệu đã tồn tại.' });
   }
 
   const status = err?.statusCode || 500;

@@ -28,16 +28,20 @@ export async function signup(req, res, next) {
     const companyId = String(req.body.companyId).trim();
     const { password } = req.body;
 
-    // Hash password with an explicit salt
-    const salt = await bcryptjs.genSalt(SALT_ROUNDS);
-    const passwordHash = await bcryptjs.hash(password, salt);
-
     const existing = await User.findOne({ email });
+    const phoneOwner = await User.findOne({ phoneNumber });
 
     if (existing?.isVerified) {
       return res.status(409).json({ success: false, message: 'Email đã được đăng ký và xác thực.' });
     }
 
+    if (phoneOwner && (!existing || !phoneOwner._id.equals(existing._id))) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại đã được đăng ký.' });
+    }
+
+    // Hash password with an explicit salt after conflict checks.
+    const salt = await bcryptjs.genSalt(SALT_ROUNDS);
+    const passwordHash = await bcryptjs.hash(password, salt);
     const otp = generateOtp();
 
     if (existing) {
@@ -164,22 +168,26 @@ export async function resendOtp(req, res, next) {
 
 /**
  * POST /api/auth/login
- * Body: { email, password }
- * Requires a verified email. Returns a JWT.
+ * Body: { identifier, password }
+ * Identifier can be an email or phone number. Requires a verified email and returns a JWT.
  */
 export async function login(req, res, next) {
   try {
-    const email = normalizeEmail(req.body.email);
+    const identifier = String(req.body.identifier).trim();
     const { password } = req.body;
+    const isEmailIdentifier = identifier.includes('@');
+    const lookup = isEmailIdentifier
+      ? { email: normalizeEmail(identifier) }
+      : { phoneNumber: normalizePhone(identifier) };
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne(lookup).select('+password');
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng.' });
+      return res.status(401).json({ success: false, message: 'Thông tin đăng nhập hoặc mật khẩu không đúng.' });
     }
 
     const ok = await bcryptjs.compare(password, user.password);
     if (!ok) {
-      return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng.' });
+      return res.status(401).json({ success: false, message: 'Thông tin đăng nhập hoặc mật khẩu không đúng.' });
     }
 
     if (!user.isVerified) {
