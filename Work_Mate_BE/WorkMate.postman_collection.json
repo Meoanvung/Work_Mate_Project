@@ -131,14 +131,14 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+          "raw": "{\n  \"identifier\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
         },
         "url": {
           "raw": "{{base_url}}/api/auth/login",
           "host": ["{{base_url}}"],
           "path": ["api", "auth", "login"]
         },
-        "description": "Chỉ đăng nhập được SAU KHI đã verify OTP.\n\n- Sai mật khẩu -> 401\n- Chưa verify OTP -> 403\n- Kết quả mong đợi: 200 { success: true, token: '...', user: {...} } (token mới được lưu vào biến `token`)"
+        "description": "Chỉ đăng nhập được SAU KHI đã verify OTP. `identifier` nhận email hoặc số điện thoại (ví dụ: +84901234567).\n\n- Sai email/số điện thoại hoặc mật khẩu -> 401\n- Chưa verify OTP -> 403\n- Kết quả mong đợi: 200 { success: true, token: '...', user: {...} } (token mới được lưu vào biến `token`)"
       }
     },
     {

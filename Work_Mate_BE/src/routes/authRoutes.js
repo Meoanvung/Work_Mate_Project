@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/authenticate.js';
 
 const router = Router();
+const PHONE_PATTERN = /^\+?[0-9\s().-]{9,20}$/;
 
 const emailRule = body('email')
   .trim()
@@ -16,7 +17,7 @@ const emailRule = body('email')
 
 const phoneRule = body('phoneNumber')
   .trim()
-  .matches(/^\+?[0-9\s().-]{9,20}$/)
+  .matches(PHONE_PATTERN)
   .withMessage('Số điện thoại không hợp lệ (ví dụ: +84901234567)');
 
 const companyIdRule = body('companyId')
@@ -39,11 +40,37 @@ const otpRule = body('otp')
   .matches(/^\d{6}$/)
   .withMessage('OTP phải gồm đúng 6 chữ số');
 
+const identifierRule = body('identifier')
+  .isString()
+  .withMessage('Email hoặc số điện thoại không hợp lệ')
+  .bail()
+  .trim()
+  .notEmpty()
+  .withMessage('Email hoặc số điện thoại không được để trống')
+  .bail()
+  .custom((identifier) => {
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier) && identifier.length <= 254;
+    const isPhone = PHONE_PATTERN.test(identifier);
+
+    if (!isEmail && !isPhone) {
+      throw new Error('Email hoặc số điện thoại không hợp lệ');
+    }
+
+    return true;
+  });
+
+const loginPasswordRule = body('password')
+  .isString()
+  .withMessage('Mật khẩu không hợp lệ')
+  .bail()
+  .notEmpty()
+  .withMessage('Mật khẩu không được để trống');
+
 // Public routes
 router.post('/signup', [emailRule, phoneRule, companyIdRule, passwordRule, validate], signup);
 router.post('/verify-email-otp', [emailRule, otpRule, validate], verifyEmailOtp);
 router.post('/resend-otp', [emailRule, validate], resendOtp);
-router.post('/login', [emailRule, body('password').notEmpty().withMessage('Mật khẩu không được để trống'), validate], login);
+router.post('/login', [identifierRule, loginPasswordRule, validate], login);
 
 // Protected route (JWT)
 router.get('/me', authenticate, me);

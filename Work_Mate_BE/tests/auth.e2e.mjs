@@ -65,27 +65,43 @@ try {
   const wrong = await post('/api/auth/verify-email-otp', { email: 'test@example.com', otp: freshOtp === '000000' ? '000001' : '000000' });
   check('wrong OTP rejected (400)', wrong.status === 400 && wrong.body.success === false);
 
-  // 4. Correct OTP (the latest one)
+  // 4. Unverified users cannot log in, including by phone number.
+  const unverifiedPhoneLogin = await post('/api/auth/login', { identifier: '+84 901 234 567', password: 'Password123' });
+  check('unverified phone login rejected (403)', unverifiedPhoneLogin.status === 403);
+
+  // 5. Correct OTP (the latest one)
   const verified = await post('/api/auth/verify-email-otp', { email: 'test@example.com', otp: freshOtp });
   check('correct OTP verifies (200)', verified.status === 200 && verified.body.success);
   check('verify returns JWT', typeof verified.body.token === 'string' && verified.body.token.split('.').length === 3);
 
   const token = verified.body.token;
 
-  // 5. Password is stored hashed — check via /me and login
+  // 6. Password is stored hashed — check via /me and both identifier types.
   const me = await fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(async (r) => ({
     status: r.status,
     body: await r.json(),
   }));
   check('/me with JWT returns the user', me.status === 200 && me.body.user?.email === 'test@example.com');
 
-  const login = await post('/api/auth/login', { email: 'test@example.com', password: 'Password123' });
-  check('login with correct password (200)', login.status === 200 && typeof login.body.token === 'string');
+  const emailLogin = await post('/api/auth/login', { identifier: 'TEST@EXAMPLE.COM', password: 'Password123' });
+  check('login by email identifier (200)', emailLogin.status === 200 && typeof emailLogin.body.token === 'string');
 
-  const badLogin = await post('/api/auth/login', { email: 'test@example.com', password: 'wrongPass1' });
-  check('login with wrong password rejected (401)', badLogin.status === 401);
+  const phoneLogin = await post('/api/auth/login', { identifier: '+84 (901) 234-567', password: 'Password123' });
+  check('login by normalized phone identifier (200)', phoneLogin.status === 200 && typeof phoneLogin.body.token === 'string');
 
-  // 6. Now verified -> duplicate signup blocked
+  const badLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'wrongPass1' });
+  check('login with wrong password rejected (401)', badLogin.status === 401 && badLogin.body.message === 'Thông tin đăng nhập hoặc mật khẩu không đúng.');
+
+  const unknownLogin = await post('/api/auth/login', { identifier: 'unknown@example.com', password: 'Password123' });
+  check('unknown identifier returns generic 401', unknownLogin.status === 401 && unknownLogin.body.message === badLogin.body.message);
+
+  const invalidLogin = await post('/api/auth/login', { identifier: 'not-an-identifier', password: 'Password123' });
+  check('invalid identifier rejected (400)', invalidLogin.status === 400 && Array.isArray(invalidLogin.body.errors));
+
+  const legacyLogin = await post('/api/auth/login', { email: 'test@example.com', password: 'Password123' });
+  check('legacy email login payload rejected (400)', legacyLogin.status === 400 && Array.isArray(legacyLogin.body.errors));
+
+  // 7. Now verified -> duplicate signup blocked
   const dup = await post('/api/auth/signup', {
     email: 'test@example.com',
     phoneNumber: '+84901234567',
@@ -94,7 +110,15 @@ try {
   });
   check('signup with already-verified email rejected (409)', dup.status === 409);
 
-  // 7. Validation still works
+  const duplicatePhone = await post('/api/auth/signup', {
+    email: 'another@example.com',
+    phoneNumber: '+84 901 234 567',
+    companyId: 'COMP-002',
+    password: 'Password123',
+  });
+  check('signup with normalized duplicate phone rejected (409)', duplicatePhone.status === 409);
+
+  // 8. Validation still works
   const invalid = await post('/api/auth/signup', { email: 'not-an-email', phoneNumber: 'abc', companyId: '', password: 'short' });
   check('invalid payload rejected (400)', invalid.status === 400 && Array.isArray(invalid.body.errors));
 } finally {

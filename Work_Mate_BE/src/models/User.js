@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Phone number is required'],
       trim: true,
+      unique: true,
+      index: true,
     },
     companyId: {
       type: String,
