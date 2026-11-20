@@ -13,24 +13,34 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -43,6 +53,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tempapp.auth.signin.EmailSignInForm
+import com.example.tempapp.auth.signin.PhoneSignInForm
 import com.example.tempapp.ui.theme.Error50
 import com.example.tempapp.ui.theme.Error500
 import com.example.tempapp.ui.theme.Error600
@@ -67,24 +79,36 @@ import com.example.tempapp.ui.theme.Warning50
 import com.example.tempapp.ui.theme.Warning500
 import kotlinx.coroutines.launch
 
+private enum class AuthSheetMode {
+    None,
+    Email,
+    Phone
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardScreen(
     onFinish: () -> Unit,
-    onSignInClick: () -> Unit = onFinish,
+    onSignIn: () -> Unit = onFinish,
     onSignUpClick: () -> Unit = onFinish
 ) {
     val pages = OnboardData.pages
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val coroutineScope = rememberCoroutineScope()
     val isFinalPage = pagerState.currentPage == pages.size - 1
+    var authSheetMode by rememberSaveable { mutableStateOf(AuthSheetMode.None) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color.White
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (authSheetMode != AuthSheetMode.None) Modifier.blur(7.dp) else Modifier),
+            color = Color.White
         ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
             // Top Section: Gradient Header & Card Illustration
             Box(
                 modifier = Modifier
@@ -185,7 +209,7 @@ fun OnboardScreen(
                     if (isFinalPage) {
                         // Final Page: "Sign In" & "Sign Up"
                         Button(
-                            onClick = onSignInClick,
+                            onClick = { authSheetMode = AuthSheetMode.Email },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(54.dp),
@@ -269,6 +293,51 @@ fun OnboardScreen(
                     }
                 }
             }
+        }
+        }
+
+        when (authSheetMode) {
+            AuthSheetMode.Email -> ModalBottomSheet(
+                onDismissRequest = { authSheetMode = AuthSheetMode.None },
+                sheetState = sheetState,
+                containerColor = Color.White,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                dragHandle = null,
+                scrimColor = Color.Black.copy(alpha = .52f)
+            ) {
+                EmailSignInForm(
+                    onSignIn = onSignIn,
+                    onPhoneSignInClick = { authSheetMode = AuthSheetMode.Phone },
+                    onSignUpClick = onSignUpClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 32.dp, vertical = 32.dp)
+                )
+            }
+
+            AuthSheetMode.Phone -> ModalBottomSheet(
+                onDismissRequest = { authSheetMode = AuthSheetMode.None },
+                sheetState = sheetState,
+                containerColor = Color.White,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                dragHandle = null,
+                scrimColor = Color.Black.copy(alpha = .52f)
+            ) {
+                PhoneSignInForm(
+                    onBackToEmailSignIn = { authSheetMode = AuthSheetMode.Email },
+                    onSignIn = onSignIn,
+                    onSignUpClick = onSignUpClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 32.dp, vertical = 32.dp)
+                )
+            }
+
+            AuthSheetMode.None -> Unit
         }
     }
 }

@@ -1,5 +1,10 @@
 package com.example.tempapp.main.profile
 
+import android.net.Uri
+import android.widget.ImageView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,9 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,14 +43,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.tempapp.R
 import com.example.tempapp.ui.theme.Gray200
 import com.example.tempapp.ui.theme.Gray400
@@ -60,39 +73,75 @@ import com.example.tempapp.ui.theme.Purple600
 fun MyWorkProfileScreen(onBackClick: () -> Unit) {
     var firstName by rememberSaveable { mutableStateOf("Tonald") }
     var lastName by rememberSaveable { mutableStateOf("Drump") }
-    var hasPhoto by rememberSaveable { mutableStateOf(false) }
+    var photoUriValue by rememberSaveable { mutableStateOf<String?>(null) }
+    var showUpdateConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showUpdateSuccess by rememberSaveable { mutableStateOf(false) }
+    val photoUri = photoUriValue?.let(Uri::parse)
+    val isUpdateSheetVisible = showUpdateConfirmation || showUpdateSuccess
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { selectedUri ->
+        selectedUri?.let { photoUriValue = it.toString() }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Gray50)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            WorkProfileTopBar(onBackClick = onBackClick)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .padding(bottom = 82.dp)
-            ) {
-                PersonalInformationCard(
-                    firstName = firstName,
-                    lastName = lastName,
-                    hasPhoto = hasPhoto,
-                    onFirstNameChange = { firstName = it },
-                    onLastNameChange = { lastName = it },
-                    onPhotoAreaClick = { hasPhoto = !hasPhoto }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                AddressCard()
-            }
-        }
-        UpdateProfileButton(
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .imePadding()
-        )
+                .fillMaxSize()
+                .then(if (isUpdateSheetVisible) Modifier.blur(7.dp) else Modifier)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                WorkProfileTopBar(onBackClick = onBackClick)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .padding(bottom = 82.dp)
+                ) {
+                    PersonalInformationCard(
+                        firstName = firstName,
+                        lastName = lastName,
+                        photoUri = photoUri,
+                        onFirstNameChange = { firstName = it },
+                        onLastNameChange = { lastName = it },
+                        onPhotoAreaClick = { photoPicker.launch("image/*") }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AddressCard()
+                }
+            }
+            UpdateProfileButton(
+                onClick = { showUpdateConfirmation = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+            )
+        }
+
+        if (showUpdateConfirmation) {
+            ProfileUpdateConfirmationSheet(
+                onDismiss = { showUpdateConfirmation = false },
+                onConfirm = {
+                    showUpdateConfirmation = false
+                    showUpdateSuccess = true
+                }
+            )
+        }
+
+        if (showUpdateSuccess) {
+            ProfileUpdateSuccessSheet(
+                onDismiss = { showUpdateSuccess = false },
+                onVisitProfile = {
+                    showUpdateSuccess = false
+                    onBackClick()
+                }
+            )
+        }
     }
 }
 
@@ -152,7 +201,7 @@ private fun WorkProfileBackButton(onClick: () -> Unit) {
 private fun PersonalInformationCard(
     firstName: String,
     lastName: String,
-    hasPhoto: Boolean,
+    photoUri: Uri?,
     onFirstNameChange: (String) -> Unit,
     onLastNameChange: (String) -> Unit,
     onPhotoAreaClick: () -> Unit
@@ -168,7 +217,7 @@ private fun PersonalInformationCard(
         Spacer(modifier = Modifier.height(4.dp))
         Text("Your personal data information", color = Gray500, fontSize = 14.sp)
         Spacer(modifier = Modifier.height(19.dp))
-        PhotoPicker(hasPhoto = hasPhoto, onClick = onPhotoAreaClick)
+        PhotoPicker(photoUri = photoUri, onClick = onPhotoAreaClick)
         Spacer(modifier = Modifier.height(16.dp))
         WorkProfileTextField(
             label = "First Name",
@@ -182,14 +231,14 @@ private fun PersonalInformationCard(
             onValueChange = onLastNameChange
         )
         Spacer(modifier = Modifier.height(13.dp))
-        WorkProfileSelector(label = "Date of Birth", value = "10 December 1997", isCalendar = true)
+        WorkProfileSelector(label = "Date of Birth", value = "Date of Birth", isCalendar = true, isPlaceholder = true)
         Spacer(modifier = Modifier.height(13.dp))
-        WorkProfileSelector(label = "Position", value = "Junior Full Stack Developer")
+        WorkProfileSelector(label = "Position", value = "Select Position", isPlaceholder = true)
     }
 }
 
 @Composable
-private fun PhotoPicker(hasPhoto: Boolean, onClick: () -> Unit) {
+private fun PhotoPicker(photoUri: Uri?, onClick: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -202,11 +251,16 @@ private fun PhotoPicker(hasPhoto: Boolean, onClick: () -> Unit) {
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            if (hasPhoto) {
-                Image(
-                    painter = painterResource(R.drawable.face),
-                    contentDescription = "Profile photo",
-                    modifier = Modifier.size(100.dp)
+            if (photoUri != null) {
+                AndroidView(
+                    factory = { context ->
+                        ImageView(context).apply {
+                            scaleType = ImageView.ScaleType.CENTER_CROP
+                            contentDescription = "Selected profile photo"
+                        }
+                    },
+                    update = { imageView -> imageView.setImageURI(photoUri) },
+                    modifier = Modifier.fillMaxSize()
                 )
                 Box(
                     modifier = Modifier
@@ -231,7 +285,7 @@ private fun PhotoPicker(hasPhoto: Boolean, onClick: () -> Unit) {
             }
         }
         Spacer(modifier = Modifier.height(9.dp))
-        Text("Upload Photo", color = Gray600, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(if (photoUri == null) "Upload Photo" else "Change Photo", color = Gray600, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(3.dp))
         Text("Format should be in .jpeg .png atleast", color = Gray500, fontSize = 11.sp)
         Text("800×800px and less than 5MB", color = Gray500, fontSize = 11.sp)
@@ -239,7 +293,12 @@ private fun PhotoPicker(hasPhoto: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WorkProfileTextField(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun WorkProfileTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String = ""
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(label, color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(5.dp))
@@ -255,6 +314,11 @@ private fun WorkProfileTextField(label: String, value: String, onValueChange: (S
                     modifier = Modifier.size(20.dp)
                 )
             },
+            placeholder = {
+                if (placeholder.isNotBlank()) {
+                    Text(placeholder, color = Gray400, fontSize = 16.sp)
+                }
+            },
             textStyle = androidx.compose.ui.text.TextStyle(color = Gray900, fontSize = 16.sp),
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -269,7 +333,12 @@ private fun WorkProfileTextField(label: String, value: String, onValueChange: (S
 }
 
 @Composable
-private fun WorkProfileSelector(label: String, value: String, isCalendar: Boolean = false) {
+private fun WorkProfileSelector(
+    label: String,
+    value: String,
+    isCalendar: Boolean = false,
+    isPlaceholder: Boolean = false
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(label, color = Gray600, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(5.dp))
@@ -282,9 +351,30 @@ private fun WorkProfileSelector(label: String, value: String, isCalendar: Boolea
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SelectorLeadingIcon(isCalendar = isCalendar)
+            if (isCalendar) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Purple500),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.calendar),
+                        contentDescription = "Calendar",
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            } else {
+                SelectorLeadingIcon(isCalendar = false)
+            }
             Spacer(modifier = Modifier.width(11.dp))
-            Text(text = value, modifier = Modifier.weight(1f), color = Gray900, fontSize = 16.sp)
+            Text(
+                text = value,
+                modifier = Modifier.weight(1f),
+                color = if (isPlaceholder) Gray400 else Gray900,
+                fontSize = 16.sp
+            )
             DownChevron()
         }
     }
@@ -350,23 +440,190 @@ private fun AddressCard() {
         Spacer(modifier = Modifier.height(4.dp))
         Text("Your current domicile", color = Gray500, fontSize = 14.sp)
         Spacer(modifier = Modifier.height(18.dp))
-        WorkProfileTextField(label = "Address", value = "", onValueChange = {})
+        WorkProfileTextField(
+            label = "Address",
+            value = "",
+            placeholder = "Enter your address",
+            onValueChange = {}
+        )
     }
 }
 
 @Composable
-private fun UpdateProfileButton(modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(28.dp)
-    Button(
-        onClick = { /* Updating profile is intentionally deferred. */ },
+private fun UpdateProfileButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ProfileGradientButton(
+        text = "Update Profile",
+        onClick = onClick,
         modifier = modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 28.dp, vertical = 14.dp)
-            .height(66.dp),
+            .width(340.dp)
+            .height(52.dp)
+            .padding(bottom = 8.dp)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileUpdateConfirmationSheet(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 32.dp)
+                .padding(top = 16.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ProfileUpdateIconTile()
+            Spacer(modifier = Modifier.height(38.dp))
+            Text(
+                text = "Update Profile",
+                color = Gray900,
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Are you sure you want to update your profile? This will\nhelp us improve your experience and provide\npersonalized features.",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            ProfileGradientButton(
+                text = "Yes, Update Profile",
+                onClick = onConfirm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(26.dp),
+                border = BorderStroke(1.dp, Purple500),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Purple500
+                )
+            ) {
+                Text(
+                    text = "No, Let me check",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileUpdateSuccessSheet(
+    onDismiss: () -> Unit,
+    onVisitProfile: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 32.dp)
+                .padding(top = 16.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ProfileUpdateIconTile()
+            Spacer(modifier = Modifier.height(38.dp))
+            Text(
+                text = "Profile Updated!",
+                color = Gray900,
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Your profile has been successfully updated. We’re\nexcited to see you take this step!",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            ProfileGradientButton(
+                text = "Visit My Profile",
+                onClick = onVisitProfile,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileUpdateIconTile() {
+    Box(
+        modifier = Modifier
+            .size(102.dp)
+            .shadow(8.dp, RoundedCornerShape(17.dp), clip = false)
+            .background(
+                Brush.verticalGradient(listOf(Purple500, Purple600)),
+                RoundedCornerShape(17.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.person),
+            contentDescription = "Profile update",
+            modifier = Modifier.size(48.dp),
+            colorFilter = ColorFilter.tint(Color.White)
+        )
+    }
+}
+
+@Composable
+private fun ProfileGradientButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(26.dp)
+    Button(
+        onClick = onClick,
+        modifier = modifier,
         shape = shape,
         contentPadding = PaddingValues(0.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            contentColor = Color.White
+        )
     ) {
         Box(
             modifier = Modifier
@@ -374,7 +631,7 @@ private fun UpdateProfileButton(modifier: Modifier = Modifier) {
                 .background(Brush.horizontalGradient(listOf(Purple500, Purple600)), shape),
             contentAlignment = Alignment.Center
         ) {
-            Text("Update Profile", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
