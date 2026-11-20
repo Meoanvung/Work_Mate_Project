@@ -106,7 +106,7 @@ fun HomeScreen(showWelcomeInitially: Boolean) {
                     title = "Today Task",
                     subtitle = "The tasks assigned to you for today",
                     message = "No Tasks Assigned",
-                    description = "It looks like you don’t have any tasks assigned to you right now. Don’t worry, this space will be updated as new tasks become available.",
+                    description = "It looks like you don’t have any tasks assigned right now. Don’t worry, this space will be updated as new tasks become available.",
                     illustration = { TaskIllustration() }
                 )
                 Spacer(modifier = Modifier.height(20.dp))
