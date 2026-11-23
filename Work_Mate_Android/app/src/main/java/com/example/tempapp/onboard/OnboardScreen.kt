@@ -54,7 +54,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tempapp.auth.signin.EmailSignInForm
+import com.example.tempapp.auth.signin.ForgotPasswordCodeForm
+import com.example.tempapp.auth.signin.ForgotPasswordEmailForm
+import com.example.tempapp.auth.signin.PasswordCreatedForm
 import com.example.tempapp.auth.signin.PhoneSignInForm
+import com.example.tempapp.auth.signin.SetNewPasswordForm
 import com.example.tempapp.ui.theme.Error50
 import com.example.tempapp.ui.theme.Error500
 import com.example.tempapp.ui.theme.Error600
@@ -82,7 +86,11 @@ import kotlinx.coroutines.launch
 private enum class AuthSheetMode {
     None,
     Email,
-    Phone
+    Phone,
+    ForgotPasswordEmail,
+    ForgotPasswordCode,
+    SetNewPassword,
+    PasswordCreated
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +105,31 @@ fun OnboardScreen(
     val coroutineScope = rememberCoroutineScope()
     val isFinalPage = pagerState.currentPage == pages.size - 1
     var authSheetMode by rememberSaveable { mutableStateOf(AuthSheetMode.None) }
+    var recoveryEmail by rememberSaveable { mutableStateOf("") }
+    var recoveryCode by rememberSaveable { mutableStateOf("") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun clearRecoveryState() {
+        recoveryEmail = ""
+        recoveryCode = ""
+        newPassword = ""
+        confirmPassword = ""
+    }
+
+    fun dismissAuthSheet() {
+        if (authSheetMode in setOf(
+                AuthSheetMode.ForgotPasswordEmail,
+                AuthSheetMode.ForgotPasswordCode,
+                AuthSheetMode.SetNewPassword,
+                AuthSheetMode.PasswordCreated
+            )
+        ) {
+            clearRecoveryState()
+        }
+        authSheetMode = AuthSheetMode.None
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
@@ -296,48 +328,79 @@ fun OnboardScreen(
         }
         }
 
-        when (authSheetMode) {
-            AuthSheetMode.Email -> ModalBottomSheet(
-                onDismissRequest = { authSheetMode = AuthSheetMode.None },
+        if (authSheetMode != AuthSheetMode.None) {
+            ModalBottomSheet(
+                onDismissRequest = ::dismissAuthSheet,
                 sheetState = sheetState,
                 containerColor = Color.White,
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 dragHandle = null,
                 scrimColor = Color.Black.copy(alpha = .52f)
             ) {
-                EmailSignInForm(
-                    onSignIn = onSignIn,
-                    onPhoneSignInClick = { authSheetMode = AuthSheetMode.Phone },
-                    onSignUpClick = onSignUpClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .imePadding()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 32.dp, vertical = 32.dp)
-                )
-            }
+                val sheetModifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 32.dp, vertical = 32.dp)
 
-            AuthSheetMode.Phone -> ModalBottomSheet(
-                onDismissRequest = { authSheetMode = AuthSheetMode.None },
-                sheetState = sheetState,
-                containerColor = Color.White,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                dragHandle = null,
-                scrimColor = Color.Black.copy(alpha = .52f)
-            ) {
-                PhoneSignInForm(
-                    onBackToEmailSignIn = { authSheetMode = AuthSheetMode.Email },
-                    onSignIn = onSignIn,
-                    onSignUpClick = onSignUpClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .imePadding()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 32.dp, vertical = 32.dp)
-                )
-            }
+                when (authSheetMode) {
+                    AuthSheetMode.Email -> EmailSignInForm(
+                        onSignIn = onSignIn,
+                        onPhoneSignInClick = { authSheetMode = AuthSheetMode.Phone },
+                        onForgotPasswordClick = {
+                            clearRecoveryState()
+                            authSheetMode = AuthSheetMode.ForgotPasswordEmail
+                        },
+                        onSignUpClick = onSignUpClick,
+                        modifier = sheetModifier
+                    )
 
-            AuthSheetMode.None -> Unit
+                    AuthSheetMode.Phone -> PhoneSignInForm(
+                        onBackToEmailSignIn = { authSheetMode = AuthSheetMode.Email },
+                        onSignIn = onSignIn,
+                        onSignUpClick = onSignUpClick,
+                        modifier = sheetModifier
+                    )
+
+                    AuthSheetMode.ForgotPasswordEmail -> ForgotPasswordEmailForm(
+                        email = recoveryEmail,
+                        onEmailChange = { recoveryEmail = it },
+                        onSendCode = {
+                            recoveryCode = ""
+                            authSheetMode = AuthSheetMode.ForgotPasswordCode
+                        },
+                        modifier = sheetModifier
+                    )
+
+                    AuthSheetMode.ForgotPasswordCode -> ForgotPasswordCodeForm(
+                        email = recoveryEmail,
+                        code = recoveryCode,
+                        onCodeChange = { recoveryCode = it },
+                        onResendCode = { recoveryCode = "" },
+                        onSubmit = { authSheetMode = AuthSheetMode.SetNewPassword },
+                        modifier = sheetModifier
+                    )
+
+                    AuthSheetMode.SetNewPassword -> SetNewPasswordForm(
+                        password = newPassword,
+                        confirmPassword = confirmPassword,
+                        onPasswordChange = { newPassword = it },
+                        onConfirmPasswordChange = { confirmPassword = it },
+                        onSubmit = { authSheetMode = AuthSheetMode.PasswordCreated },
+                        modifier = sheetModifier
+                    )
+
+                    AuthSheetMode.PasswordCreated -> PasswordCreatedForm(
+                        onSignIn = {
+                            clearRecoveryState()
+                            authSheetMode = AuthSheetMode.Email
+                        },
+                        modifier = sheetModifier
+                    )
+
+                    AuthSheetMode.None -> Unit
+                }
+            }
         }
     }
 }

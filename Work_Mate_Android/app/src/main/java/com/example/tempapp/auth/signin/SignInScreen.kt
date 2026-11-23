@@ -82,6 +82,7 @@ fun SignInScreen(
         EmailSignInForm(
             onSignIn = onSignIn,
             onPhoneSignInClick = onPhoneSignInClick,
+            onForgotPasswordClick = {},
             onSignUpClick = onSignUpClick,
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,6 +100,7 @@ fun SignInScreen(
 fun EmailSignInForm(
     onSignIn: () -> Unit,
     onPhoneSignInClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit,
     onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -181,6 +183,7 @@ fun EmailSignInForm(
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Forgot Password",
+                modifier = Modifier.clickable(onClick = onForgotPasswordClick),
                 color = Purple500,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
@@ -217,13 +220,14 @@ fun EmailSignInForm(
 }
 
 @Composable
-private fun SignInTextField(
+internal fun SignInTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
     leadingIcon: @Composable () -> Unit,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default,
     trailingIcon: @Composable (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -240,6 +244,7 @@ private fun SignInTextField(
             placeholder = { Text(placeholder, color = Gray400, fontSize = 15.sp) },
             textStyle = androidx.compose.ui.text.TextStyle(color = Gray900, fontSize = 15.sp),
             visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Purple500,
                 unfocusedBorderColor = Gray400,
@@ -252,7 +257,7 @@ private fun SignInTextField(
 }
 
 @Composable
-private fun GradientButton(
+internal fun GradientButton(
     text: String,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -351,7 +356,7 @@ private fun BrandMark(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PasswordFieldIcon() {
+internal fun PasswordFieldIcon() {
     Canvas(modifier = Modifier.size(22.dp)) {
         val stroke = 1.7f
         drawRoundRect(
@@ -374,7 +379,7 @@ private fun PasswordFieldIcon() {
 }
 
 @Composable
-private fun PasswordVisibilityIcon(isVisible: Boolean, onClick: () -> Unit) {
+internal fun PasswordVisibilityIcon(isVisible: Boolean, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     Canvas(
         modifier = Modifier
