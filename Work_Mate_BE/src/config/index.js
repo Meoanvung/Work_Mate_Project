@@ -12,6 +12,7 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
 
   otpTtlMinutes: Number(process.env.OTP_TTL_MINUTES) || 10,
+  passwordResetTokenTtlMinutes: Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES) || 10,
 
   emailProvider: (process.env.EMAIL_PROVIDER || 'auto').toLowerCase(), // auto | smtp | console
   emailFrom: process.env.EMAIL_FROM || 'WorkMate <no-reply@workmate.app>',

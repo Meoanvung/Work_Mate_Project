@@ -1,6 +1,16 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { signup, verifyEmailOtp, resendOtp, login, me } from '../controllers/authController.js';
+import {
+  signup,
+  verifyEmailOtp,
+  resendOtp,
+  login,
+  requestPasswordReset,
+  resendPasswordReset,
+  verifyPasswordResetOtp,
+  completePasswordReset,
+  me,
+} from '../controllers/authController.js';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/authenticate.js';
 
@@ -66,11 +76,45 @@ const loginPasswordRule = body('password')
   .notEmpty()
   .withMessage('Mật khẩu không được để trống');
 
+const newPasswordRule = body('newPassword')
+  .isString()
+  .withMessage('Mật khẩu mới không hợp lệ')
+  .bail()
+  .isLength({ min: 8, max: 72 })
+  .withMessage('Mật khẩu mới phải có ít nhất 8 ký tự')
+  .matches(/[A-Za-z]/)
+  .withMessage('Mật khẩu mới phải chứa ít nhất một chữ cái')
+  .matches(/[0-9]/)
+  .withMessage('Mật khẩu mới phải chứa ít nhất một chữ số');
+
+const confirmPasswordRule = body('confirmPassword')
+  .isString()
+  .withMessage('Xác nhận mật khẩu không hợp lệ')
+  .bail()
+  .custom((confirmPassword, { req }) => {
+    if (confirmPassword !== req.body.newPassword) {
+      throw new Error('Xác nhận mật khẩu không khớp');
+    }
+    return true;
+  });
+
+const resetTokenRule = body('resetToken')
+  .isString()
+  .withMessage('Yêu cầu đặt lại mật khẩu không hợp lệ')
+  .bail()
+  .trim()
+  .isLength({ min: 32, max: 256 })
+  .withMessage('Yêu cầu đặt lại mật khẩu không hợp lệ');
+
 // Public routes
 router.post('/signup', [emailRule, phoneRule, companyIdRule, passwordRule, validate], signup);
 router.post('/verify-email-otp', [emailRule, otpRule, validate], verifyEmailOtp);
 router.post('/resend-otp', [emailRule, validate], resendOtp);
 router.post('/login', [identifierRule, loginPasswordRule, validate], login);
+router.post('/password-reset/request', [emailRule, validate], requestPasswordReset);
+router.post('/password-reset/resend', [emailRule, validate], resendPasswordReset);
+router.post('/password-reset/verify', [emailRule, otpRule, validate], verifyPasswordResetOtp);
+router.post('/password-reset/complete', [resetTokenRule, newPasswordRule, confirmPasswordRule, validate], completePasswordReset);
 
 // Protected route (JWT)
 router.get('/me', authenticate, me);

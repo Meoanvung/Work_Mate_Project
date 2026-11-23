@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "WorkMate - Auth (Signup + OTP + JWT)",
-    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn (dùng để nhận OTP)\n- password: mật khẩu (>=8 ký tự, có chữ + số, ví dụ Password123)\n- otp: mã OTP 6 số (lấy từ email hoặc console server nếu EMAIL_PROVIDER=console)\n- token: tự động được lưu sau khi gọi verify-email-otp hoặc login thành công\n\nChạy theo thứ tự: 1) Health check -> 2) Signup -> 3) Verify OTP -> 4) Me -> 5) Login -> (tùy chọn) Resend OTP",
+    "name": "WorkMate - Auth (Signup + OTP + JWT + Password Reset)",
+    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập / quên mật khẩu của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn\n- password: mật khẩu hiện tại (>=8 ký tự, có chữ + số)\n- otp: OTP xác thực signup\n- token: JWT tự động lưu sau khi verify signup hoặc login\n- reset_otp: OTP đặt lại mật khẩu (lấy từ email hoặc console server)\n- reset_token: token one-time tự lưu sau khi verify reset OTP\n- new_password: mật khẩu mới\n\nPassword reset theo UI Android: Request code -> Verify code -> Complete password reset -> Sign in lại bằng mật khẩu mới. Reset password không tự đăng nhập và không trả JWT.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -10,80 +10,28 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/health",
-          "host": ["{{base_url}}"],
-          "path": ["api", "health"]
-        }
+        "url": { "raw": "{{base_url}}/api/health", "host": ["{{base_url}}"], "path": ["api", "health"] }
       }
     },
     {
       "name": "2. Signup (đăng ký + gửi OTP)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('signup should return 200 or 409 (email đã tồn tại)', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
-              "});"
-            ]
-          }
-        }
-      ],
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('signup should return 200 or 409 (email đã tồn tại)', function () {", "  pm.expect(pm.response.code).to.be.oneOf([200, 409]);", "});"] } }],
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"+84901234567\",\n  \"companyId\": \"COMP-001\",\n  \"password\": \"{{password}}\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/auth/signup",
-          "host": ["{{base_url}}"],
-          "path": ["api", "auth", "signup"]
-        },
-        "description": "Tạo tài khoản CHƯA kích hoạt + gửi OTP 6 số về email.\n- EMAIL_PROVIDER=console: OTP in ra terminal của server (dòng `[email:console] OTP for ...`)\n- EMAIL_PROVIDER=smtp: OTP gửi tới email thật của bạn (kiểm tra cả Spam/Junk)\n\nKết quả mong đợi: 200 { success: true }"
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"+84901234567\",\n  \"companyId\": \"COMP-001\",\n  \"password\": \"{{password}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/signup", "host": ["{{base_url}}"], "path": ["api", "auth", "signup"] },
+        "description": "Tạo tài khoản CHƯA kích hoạt + gửi OTP 6 số về email. EMAIL_PROVIDER=console in OTP tại terminal."
       }
     },
     {
       "name": "3. Verify Email OTP (lấy JWT)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('verify returns 200', function () {",
-              "  pm.expect(pm.response.code).to.eql(200);",
-              "});",
-              "const body = pm.response.json();",
-              "if (body && body.token) {",
-              "  pm.collectionVariables.set('token', body.token);",
-              "  console.log('Token saved to collection variable: {{token}}');",
-              "}"
-            ]
-          }
-        }
-      ],
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('verify returns 200', function () {", "  pm.expect(pm.response.code).to.eql(200);", "});", "const body = pm.response.json();", "if (body && body.token) {", "  pm.collectionVariables.set('token', body.token);", "}"] } }],
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/auth/verify-email-otp",
-          "host": ["{{base_url}}"],
-          "path": ["api", "auth", "verify-email-otp"]
-        },
-        "description": "Nhập OTP nhận được -> server kích hoạt tài khoản và TRẢ VỀ JWT (token).\nToken sẽ được tự động lưu vào collection variable `token` (xem tab Tests).\n\n- OTP sai -> 400 (còn tối đa 5 lần)\n- OTP hết hạn (10 phút) -> 400\n- Kết quả mong đợi: 200 { success: true, token: '...', user: {...} }"
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/verify-email-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "verify-email-otp"] }
       }
     },
     {
@@ -91,73 +39,69 @@
       "request": {
         "method": "GET",
         "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            { "key": "token", "value": "{{token}}", "type": "string" }
-          ]
-        },
-        "url": {
-          "raw": "{{base_url}}/api/auth/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "auth", "me"]
-        },
-        "description": "Header bắt buộc: Authorization: Bearer {{token}}\n\n- Thiếu/sai token -> 401\n- Kết quả mong đợi: 200 { success: true, user: {...} }"
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
       }
     },
     {
       "name": "5. Login (đăng nhập)",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('login returns 200', function () {",
-              "  pm.expect(pm.response.code).to.eql(200);",
-              "});",
-              "const body = pm.response.json();",
-              "if (body && body.token) {",
-              "  pm.collectionVariables.set('token', body.token);",
-              "}"
-            ]
-          }
-        }
-      ],
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('login returns 200', function () {", "  pm.expect(pm.response.code).to.eql(200);", "});", "const body = pm.response.json();", "if (body && body.token) {", "  pm.collectionVariables.set('token', body.token);", "}"] } }],
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"identifier\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/auth/login",
-          "host": ["{{base_url}}"],
-          "path": ["api", "auth", "login"]
-        },
-        "description": "Chỉ đăng nhập được SAU KHI đã verify OTP. `identifier` nhận email hoặc số điện thoại (ví dụ: +84901234567).\n\n- Sai email/số điện thoại hoặc mật khẩu -> 401\n- Chưa verify OTP -> 403\n- Kết quả mong đợi: 200 { success: true, token: '...', user: {...} } (token mới được lưu vào biến `token`)"
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] },
+        "description": "`identifier` nhận email hoặc số điện thoại. Chỉ đăng nhập được sau khi verify OTP."
       }
     },
     {
-      "name": "6. Resend OTP (gửi lại mã)",
+      "name": "6. Resend signup OTP",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{email}}\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/auth/resend-otp",
-          "host": ["{{base_url}}"],
-          "path": ["api", "auth", "resend-otp"]
-        },
-        "description": "Gửi lại OTP mới (chỉ khi chưa verify).\n\n- Tài khoản đã verify -> 400\n- Kết quả mong đợi: 200 { success: true }"
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/resend-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "resend-otp"] }
+      }
+    },
+    {
+      "name": "7. Password reset - Request verification code",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-reset/request", "host": ["{{base_url}}"], "path": ["api", "auth", "password-reset", "request"] },
+        "description": "Bước Forgot Password: gửi OTP sáu số. Response luôn trung lập, không trả OTP hoặc JWT."
+      }
+    },
+    {
+      "name": "8. Password reset - Resend code",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-reset/resend", "host": ["{{base_url}}"], "path": ["api", "auth", "password-reset", "resend"] },
+        "description": "Khớp nút Resend it trong UI: gửi code mới và vô hiệu code/token cũ."
+      }
+    },
+    {
+      "name": "9. Password reset - Verify code",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('reset OTP verification returns 200', function () {", "  pm.expect(pm.response.code).to.eql(200);", "});", "const body = pm.response.json();", "if (body && body.resetToken) {", "  pm.collectionVariables.set('reset_token', body.resetToken);", "}"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{reset_otp}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-reset/verify", "host": ["{{base_url}}"], "path": ["api", "auth", "password-reset", "verify"] },
+        "description": "OTP hợp lệ tạo reset_token one-time, không đăng nhập và không trả JWT."
+      }
+    },
+    {
+      "name": "10. Password reset - Set new password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"resetToken\": \"{{reset_token}}\",\n  \"newPassword\": \"{{new_password}}\",\n  \"confirmPassword\": \"{{new_password}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-reset/complete", "host": ["{{base_url}}"], "path": ["api", "auth", "password-reset", "complete"] },
+        "description": "Bước Set a New Password. Thành công chỉ báo hoàn thành; quay về Sign In và dùng mật khẩu mới để đăng nhập."
       }
     }
   ],
@@ -166,6 +110,9 @@
     { "key": "email", "value": "youremail@example.com" },
     { "key": "password", "value": "Password123" },
     { "key": "otp", "value": "" },
-    { "key": "token", "value": "" }
+    { "key": "token", "value": "" },
+    { "key": "reset_otp", "value": "" },
+    { "key": "reset_token", "value": "" },
+    { "key": "new_password", "value": "NewPassword123" }
   ]
 }

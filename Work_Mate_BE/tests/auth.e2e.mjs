@@ -101,7 +101,62 @@ try {
   const legacyLogin = await post('/api/auth/login', { email: 'test@example.com', password: 'Password123' });
   check('legacy email login payload rejected (400)', legacyLogin.status === 400 && Array.isArray(legacyLogin.body.errors));
 
-  // 7. Now verified -> duplicate signup blocked
+  // 7. Password reset: request, resend, verify OTP, set a new password, then sign in again.
+  const resetRequest = await post('/api/auth/password-reset/request', { email: 'test@example.com' });
+  check(
+    'password reset request is generic and does not leak OTP',
+    resetRequest.status === 200 && resetRequest.body.message === 'Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.' && !JSON.stringify(resetRequest.body).match(/\b\d{6}\b/)
+  );
+  const firstResetOtp = globalThis.__lastPasswordResetOtp;
+  check('password reset OTP was sent in console mode', typeof firstResetOtp === 'string' && firstResetOtp.length === 6);
+
+  const unknownResetRequest = await post('/api/auth/password-reset/request', { email: 'unknown@example.com' });
+  check(
+    'unknown reset email receives the same generic response',
+    unknownResetRequest.status === 200 && unknownResetRequest.body.message === resetRequest.body.message
+  );
+
+  const resetResend = await post('/api/auth/password-reset/resend', { email: 'test@example.com' });
+  const latestResetOtp = globalThis.__lastPasswordResetOtp;
+  check('password reset resend succeeds', resetResend.status === 200 && resetResend.body.message === resetRequest.body.message);
+
+  const oldResetOtp = await post('/api/auth/password-reset/verify', { email: 'test@example.com', otp: firstResetOtp });
+  check('resend invalidates prior reset OTP', oldResetOtp.status === 400);
+
+  const resetVerify = await post('/api/auth/password-reset/verify', { email: 'test@example.com', otp: latestResetOtp });
+  check(
+    'reset OTP verification returns one-use reset token, not auth JWT',
+    resetVerify.status === 200 && typeof resetVerify.body.resetToken === 'string' && !resetVerify.body.token && !resetVerify.body.user
+  );
+
+  const resetMismatch = await post('/api/auth/password-reset/complete', {
+    resetToken: resetVerify.body.resetToken,
+    newPassword: 'NewPassword123',
+    confirmPassword: 'DifferentPassword123',
+  });
+  check('mismatched new passwords rejected (400)', resetMismatch.status === 400 && Array.isArray(resetMismatch.body.errors));
+
+  const resetComplete = await post('/api/auth/password-reset/complete', {
+    resetToken: resetVerify.body.resetToken,
+    newPassword: 'NewPassword123',
+    confirmPassword: 'NewPassword123',
+  });
+  check('password reset completes without auth JWT', resetComplete.status === 200 && !resetComplete.body.token && !resetComplete.body.user);
+
+  const reusedResetToken = await post('/api/auth/password-reset/complete', {
+    resetToken: resetVerify.body.resetToken,
+    newPassword: 'AnotherPassword123',
+    confirmPassword: 'AnotherPassword123',
+  });
+  check('used reset token is rejected (400)', reusedResetToken.status === 400);
+
+  const oldPasswordLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'Password123' });
+  check('old password fails after reset (401)', oldPasswordLogin.status === 401);
+
+  const newPasswordLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'NewPassword123' });
+  check('new password can sign in after reset (200)', newPasswordLogin.status === 200 && typeof newPasswordLogin.body.token === 'string');
+
+  // 8. Now verified -> duplicate signup blocked
   const dup = await post('/api/auth/signup', {
     email: 'test@example.com',
     phoneNumber: '+84901234567',
@@ -118,7 +173,7 @@ try {
   });
   check('signup with normalized duplicate phone rejected (409)', duplicatePhone.status === 409);
 
-  // 8. Validation still works
+  // 9. Validation still works
   const invalid = await post('/api/auth/signup', { email: 'not-an-email', phoneNumber: 'abc', companyId: '', password: 'short' });
   check('invalid payload rejected (400)', invalid.status === 400 && Array.isArray(invalid.body.errors));
 } finally {

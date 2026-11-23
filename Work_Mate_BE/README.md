@@ -98,6 +98,37 @@ Gửi lại OTP (chỉ khi tài khoản chưa xác thực).
 ```
 `identifier` có thể là email hoặc số điện thoại (ví dụ: `+84901234567`). Số điện thoại được chuẩn hóa bằng cách bỏ khoảng trắng, ngoặc, dấu chấm và gạch nối trước khi tra MongoDB. Chỉ cho phép đăng nhập khi email **đã xác thực**. Response chứa JWT; sai identifier hoặc mật khẩu trả về `401` với thông báo chung.
 
+### Password reset (Forgot Password)
+Luồng này khớp UI Android: nhập email → OTP 6 số/resend → đặt password mới + confirm → quay lại Sign In. Việc reset **không tự đăng nhập** và không trả JWT.
+
+#### `POST /api/auth/password-reset/request`
+```json
+{ "email": "user@example.com" }
+```
+Trả `200` với thông báo trung lập. Nếu email thuộc tài khoản đã xác thực, OTP sẽ được gửi tới email; response không tiết lộ email có tồn tại hay không.
+
+#### `POST /api/auth/password-reset/resend`
+```json
+{ "email": "user@example.com" }
+```
+Gửi OTP reset mới ngay lập tức, đồng thời vô hiệu OTP và reset token cũ.
+
+#### `POST /api/auth/password-reset/verify`
+```json
+{ "email": "user@example.com", "otp": "123456" }
+```
+OTP hợp lệ trả `resetToken` one-time ngắn hạn cùng `expiresAt`. Token này không phải JWT và chỉ dùng cho bước complete.
+
+#### `POST /api/auth/password-reset/complete`
+```json
+{
+  "resetToken": "<resetToken từ bước verify>",
+  "newPassword": "NewPassword123",
+  "confirmPassword": "NewPassword123"
+}
+```
+Hai password phải giống nhau và tuân theo rule ≥ 8 ký tự, gồm chữ và số. Thành công trả `200` nhưng không trả JWT; dùng mật khẩu mới để gọi `/api/auth/login`.
+
 ### `GET /api/auth/me` 🔒
 Header: `Authorization: Bearer <JWT>` → trả về thông tin user.
 
