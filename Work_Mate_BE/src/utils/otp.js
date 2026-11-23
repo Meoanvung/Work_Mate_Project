@@ -1,4 +1,4 @@
-import { createHmac, randomInt, timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { config } from '../config/index.js';
 
 /** Generate a cryptographically-random 6-digit OTP. */
@@ -22,6 +22,21 @@ export function verifyOtpHash(otp, storedHash) {
 
 export function otpExpiryDate() {
   return new Date(Date.now() + config.otpTtlMinutes * 60 * 1000);
+}
+
+/** Generate a high-entropy, URL-safe one-use capability for completing a password reset. */
+export function generatePasswordResetToken() {
+  return randomBytes(32).toString('base64url');
+}
+
+/** HMAC-hash a reset capability before persisting it. */
+export function hashPasswordResetToken(token) {
+  return createHmac('sha256', config.jwtSecret).update(`password-reset:${String(token)}`).digest('hex');
+}
+
+/** Expiry for the one-use reset capability issued after OTP verification. */
+export function passwordResetTokenExpiryDate() {
+  return new Date(Date.now() + config.passwordResetTokenTtlMinutes * 60 * 1000);
 }
 
 export const MAX_OTP_ATTEMPTS = 5;

@@ -48,6 +48,32 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: 0,
     },
+    // Password reset state is intentionally separate from signup verification OTP state.
+    passwordResetOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordResetOtpExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    passwordResetAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+    },
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordResetTokenExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -1,7 +1,16 @@
 import bcryptjs from 'bcryptjs';
 import { User } from '../models/User.js';
-import { generateOtp, hashOtp, verifyOtpHash, otpExpiryDate, MAX_OTP_ATTEMPTS } from '../utils/otp.js';
-import { sendOtpEmail } from '../utils/emailService.js';
+import {
+  generateOtp,
+  hashOtp,
+  verifyOtpHash,
+  otpExpiryDate,
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  passwordResetTokenExpiryDate,
+  MAX_OTP_ATTEMPTS,
+} from '../utils/otp.js';
+import { sendOtpEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
 import { signAuthToken } from '../utils/token.js';
 
 const SALT_ROUNDS = 10;
@@ -15,6 +24,28 @@ function attachOtp(user, otp) {
   user.verificationOtpExpires = otpExpiryDate();
   user.verificationAttempts = 0;
 }
+
+function clearPasswordResetState(user) {
+  user.passwordResetOtpHash = null;
+  user.passwordResetOtpExpires = null;
+  user.passwordResetAttempts = 0;
+  user.passwordResetTokenHash = null;
+  user.passwordResetTokenExpires = null;
+}
+
+function attachPasswordResetOtp(user, otp) {
+  clearPasswordResetState(user);
+  user.passwordResetOtpHash = hashOtp(otp);
+  user.passwordResetOtpExpires = otpExpiryDate();
+}
+
+const passwordResetFields =
+  '+passwordResetOtpHash +passwordResetOtpExpires +passwordResetAttempts ' +
+  '+passwordResetTokenHash +passwordResetTokenExpires';
+
+const GENERIC_RESET_REQUEST_MESSAGE = 'Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.';
+const INVALID_RESET_OTP_MESSAGE = 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.';
+const INVALID_RESET_TOKEN_MESSAGE = 'Yêu cầu đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.';
 
 /**
  * POST /api/auth/signup
@@ -196,6 +227,118 @@ export async function login(req, res, next) {
 
     const token = signAuthToken(user);
     return res.status(200).json({ success: true, message: 'Đăng nhập thành công.', token, user: user.toPublicJSON() });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-reset/request
+ * Body: { email }
+ * Always returns the same response to avoid revealing whether an account exists.
+ */
+export async function requestPasswordReset(req, res, next) {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const user = await User.findOne({ email });
+
+    if (user?.isVerified) {
+      const otp = generateOtp();
+      attachPasswordResetOtp(user, otp);
+      await user.save();
+      await sendPasswordResetOtpEmail(email, otp);
+    }
+
+    return res.status(200).json({ success: true, message: GENERIC_RESET_REQUEST_MESSAGE });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-reset/resend
+ * Body: { email }
+ * Immediately rotates the reset code to match the Android recovery UI.
+ */
+export async function resendPasswordReset(req, res, next) {
+  return requestPasswordReset(req, res, next);
+}
+
+/**
+ * POST /api/auth/password-reset/verify
+ * Body: { email, otp }
+ * Exchanges a valid six-digit reset OTP for a short-lived, one-use reset token.
+ */
+export async function verifyPasswordResetOtp(req, res, next) {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const otp = String(req.body.otp).trim();
+    const user = await User.findOne({ email }).select(passwordResetFields);
+
+    if (!user?.isVerified || !user.passwordResetOtpHash || !user.passwordResetOtpExpires) {
+      return res.status(400).json({ success: false, message: INVALID_RESET_OTP_MESSAGE });
+    }
+
+    if (user.passwordResetOtpExpires.getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: INVALID_RESET_OTP_MESSAGE });
+    }
+
+    if (user.passwordResetAttempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: 'Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã OTP mới.',
+      });
+    }
+
+    if (!verifyOtpHash(otp, user.passwordResetOtpHash)) {
+      user.passwordResetAttempts += 1;
+      await user.save();
+      return res.status(400).json({ success: false, message: INVALID_RESET_OTP_MESSAGE });
+    }
+
+    const resetToken = generatePasswordResetToken();
+    user.passwordResetOtpHash = null;
+    user.passwordResetOtpExpires = null;
+    user.passwordResetAttempts = 0;
+    user.passwordResetTokenHash = hashPasswordResetToken(resetToken);
+    user.passwordResetTokenExpires = passwordResetTokenExpiryDate();
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Mã xác thực hợp lệ. Vui lòng đặt mật khẩu mới.',
+      resetToken,
+      expiresAt: user.passwordResetTokenExpires,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-reset/complete
+ * Body: { resetToken, newPassword, confirmPassword }
+ * Sets a new password but intentionally does not issue an authenticated session.
+ */
+export async function completePasswordReset(req, res, next) {
+  try {
+    const { resetToken, newPassword } = req.body;
+    const passwordResetTokenHash = hashPasswordResetToken(resetToken);
+    const user = await User.findOne({ passwordResetTokenHash }).select(passwordResetFields);
+
+    if (!user?.passwordResetTokenExpires || user.passwordResetTokenExpires.getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: INVALID_RESET_TOKEN_MESSAGE });
+    }
+
+    const salt = await bcryptjs.genSalt(SALT_ROUNDS);
+    user.password = await bcryptjs.hash(newPassword, salt);
+    clearPasswordResetState(user);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+    });
   } catch (err) {
     return next(err);
   }
