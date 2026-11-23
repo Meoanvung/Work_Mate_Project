@@ -68,7 +68,11 @@ import com.example.tempapp.ui.theme.Purple500
 import com.example.tempapp.ui.theme.Purple600
 
 @Composable
-fun HomeScreen(showWelcomeInitially: Boolean) {
+fun HomeScreen(
+    showWelcomeInitially: Boolean,
+    onMessagesClick: () -> Unit,
+    onNotificationsClick: () -> Unit
+) {
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var showWelcome by rememberSaveable { mutableStateOf(showWelcomeInitially) }
@@ -90,7 +94,10 @@ fun HomeScreen(showWelcomeInitially: Boolean) {
                     .padding(horizontal = 16.dp)
                     .statusBarsPadding()
             ) {
-                HomeHeader()
+                HomeHeader(
+                    onMessagesClick = onMessagesClick,
+                    onNotificationsClick = onNotificationsClick
+                )
                 Spacer(modifier = Modifier.height(18.dp))
                 WorkSummaryCard()
                 Spacer(modifier = Modifier.height(16.dp))
@@ -128,7 +135,10 @@ fun HomeScreen(showWelcomeInitially: Boolean) {
 }
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(
+    onMessagesClick: () -> Unit,
+    onNotificationsClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -156,18 +166,31 @@ private fun HomeHeader() {
             }
             Text(text = "Tonald@work.com", color = Purple500, fontSize = 13.sp)
         }
-        HeaderAction(iconRes = R.drawable.message, contentDescription = "Messages")
+        HeaderAction(
+            iconRes = R.drawable.message,
+            contentDescription = "Messages",
+            onClick = onMessagesClick
+        )
         Spacer(modifier = Modifier.width(10.dp))
-        HeaderAction(iconRes = R.drawable.notification, contentDescription = "Notifications")
+        HeaderAction(
+            iconRes = R.drawable.notification,
+            contentDescription = "Notifications",
+            onClick = onNotificationsClick
+        )
     }
 }
 
 @Composable
-private fun HeaderAction(iconRes: Int, contentDescription: String) {
+private fun HeaderAction(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: (() -> Unit)? = null
+) {
     Box(
         modifier = Modifier
             .size(44.dp)
-            .background(Purple25, CircleShape),
+            .background(Purple25, CircleShape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Image(
