@@ -53,11 +53,12 @@ private data class ProfileMenuItem(
 fun ProfileScreen(
     onBackClick: () -> Unit,
     onMyWorkProfileClick: () -> Unit,
+    onOfficeAssetsClick: () -> Unit,
     onChangePasswordClick: () -> Unit
 ) {
     val accountItems = listOf(
         ProfileMenuItem("My Work Profile", R.drawable.person, onClick = onMyWorkProfileClick),
-        ProfileMenuItem("Office Assets", R.drawable.assets),
+        ProfileMenuItem("Office Assets", R.drawable.assets, onClick = onOfficeAssetsClick),
         ProfileMenuItem("Payroll & Tax", R.drawable.tax),
         ProfileMenuItem("Roles", R.drawable.role)
     )

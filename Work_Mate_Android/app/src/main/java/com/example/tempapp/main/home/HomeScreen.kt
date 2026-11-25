@@ -90,16 +90,24 @@ fun HomeScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .background(Color.White)
                     .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 HomeHeader(
                     onMessagesClick = onMessagesClick,
                     onNotificationsClick = onNotificationsClick,
                     onProfileClick = onProfileClick
                 )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(Purple25)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
                 Spacer(modifier = Modifier.height(18.dp))
                 WorkSummaryCard()
                 Spacer(modifier = Modifier.height(16.dp))
@@ -143,32 +151,34 @@ private fun HomeHeader(
     onProfileClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(46.dp)
+                .size(52.dp)
                 .background(Purple100, CircleShape)
                 .clickable(onClick = onProfileClick),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "⌣", color = Purple500, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+            Image(
+                painter = painterResource(R.drawable.person),
+                contentDescription = "Open profile",
+                modifier = Modifier.size(24.dp)
+            )
         }
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Tonald Drump", color = Gray900, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Tonald Drump", color = Gray900, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.width(7.dp))
                 Image(
                     painter = painterResource(R.drawable.tick),
                     contentDescription = "Verified account",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(19.dp)
                 )
             }
-            Text(text = "Tonald@work.com", color = Purple500, fontSize = 13.sp)
+            Text(text = "Tonald@work.com", color = Purple500, fontSize = 14.sp)
         }
         HeaderAction(
             iconRes = R.drawable.message,
@@ -192,15 +202,15 @@ private fun HeaderAction(
 ) {
     Box(
         modifier = Modifier
-            .size(44.dp)
-            .background(Purple25, CircleShape)
+            .size(50.dp)
+            .background(Purple100, CircleShape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(22.dp)
         )
     }
 }
@@ -210,24 +220,105 @@ private fun WorkSummaryCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(102.dp)
-            .clip(RoundedCornerShape(15.dp))
+            .height(128.dp)
+            .clip(RoundedCornerShape(21.dp))
             .background(Brush.horizontalGradient(listOf(Purple500, Purple600)))
-            .padding(16.dp)
+            .padding(20.dp)
     ) {
-        Column {
-            Text(text = "My Work Summary", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(text = "Today task & presence activity", color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp)
+        Column(
+            modifier = Modifier.fillMaxWidth(.64f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "My Work Summary", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = "Today task & presence activity",
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 14.sp,
+                lineHeight = 19.sp
+            )
         }
-        Canvas(modifier = Modifier.align(Alignment.CenterEnd).size(78.dp)) {
-            drawCircle(Color.White.copy(alpha = 0.22f), radius = size.minDimension * 0.44f, center = Offset(size.width * .70f, size.height * .48f))
-            drawLine(Color.White.copy(alpha = .82f), Offset(size.width * .18f, size.height * .70f), Offset(size.width * .78f, size.height * .34f), strokeWidth = 10f)
-            drawCircle(Color.White, radius = 7f, center = Offset(size.width * .19f, size.height * .70f))
-            drawCircle(Color.White, radius = 7f, center = Offset(size.width * .78f, size.height * .34f))
-            drawCircle(Color.White.copy(alpha = .86f), radius = 3f, center = Offset(size.width * .20f, size.height * .16f))
-            drawCircle(Color.White.copy(alpha = .86f), radius = 4f, center = Offset(size.width * .92f, size.height * .12f))
-        }
+        SummaryCameraIllustration(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 12.dp)
+                .size(width = 142.dp, height = 122.dp)
+        )
+    }
+}
+
+@Composable
+private fun SummaryCameraIllustration(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val bodyLeft = size.width * .30f
+        val bodyTop = size.height * .40f
+        val bodyWidth = size.width * .56f
+        val bodyHeight = size.height * .30f
+        val white = Color.White
+
+        drawCircle(
+            color = white.copy(alpha = .18f),
+            radius = size.minDimension * .40f,
+            center = Offset(size.width * .72f, size.height * .50f)
+        )
+        drawRoundRect(
+            color = white.copy(alpha = .92f),
+            topLeft = Offset(bodyLeft, bodyTop),
+            size = Size(bodyWidth, bodyHeight),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(13f, 13f)
+        )
+        drawRoundRect(
+            color = white.copy(alpha = .82f),
+            topLeft = Offset(bodyLeft + bodyWidth * .12f, bodyTop - bodyHeight * .16f),
+            size = Size(bodyWidth * .22f, bodyHeight * .20f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f, 5f)
+        )
+        drawCircle(
+            color = Purple600.copy(alpha = .75f),
+            radius = bodyHeight * .27f,
+            center = Offset(bodyLeft + bodyWidth * .53f, bodyTop + bodyHeight * .52f)
+        )
+        drawCircle(
+            color = Gray900.copy(alpha = .82f),
+            radius = bodyHeight * .16f,
+            center = Offset(bodyLeft + bodyWidth * .53f, bodyTop + bodyHeight * .52f)
+        )
+        drawLine(
+            color = white.copy(alpha = .86f),
+            start = Offset(size.width * .10f, size.height * .30f),
+            end = Offset(size.width * .10f, size.height * .50f),
+            strokeWidth = 4f
+        )
+        drawLine(
+            color = white.copy(alpha = .86f),
+            start = Offset(size.width * .02f, size.height * .40f),
+            end = Offset(size.width * .18f, size.height * .40f),
+            strokeWidth = 4f
+        )
+        drawLine(
+            color = white.copy(alpha = .88f),
+            start = Offset(size.width * .27f, size.height * .14f),
+            end = Offset(size.width * .27f, size.height * .29f),
+            strokeWidth = 3f
+        )
+        drawLine(
+            color = white.copy(alpha = .88f),
+            start = Offset(size.width * .21f, size.height * .215f),
+            end = Offset(size.width * .33f, size.height * .215f),
+            strokeWidth = 3f
+        )
+        drawLine(
+            color = white.copy(alpha = .86f),
+            start = Offset(size.width * .84f, size.height * .14f),
+            end = Offset(size.width * .84f, size.height * .25f),
+            strokeWidth = 3f
+        )
+        drawLine(
+            color = white.copy(alpha = .86f),
+            start = Offset(size.width * .79f, size.height * .195f),
+            end = Offset(size.width * .89f, size.height * .195f),
+            strokeWidth = 3f
+        )
     }
 }
 

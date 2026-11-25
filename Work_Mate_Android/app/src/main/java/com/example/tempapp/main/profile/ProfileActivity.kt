@@ -18,6 +18,9 @@ class ProfileActivity : ComponentActivity() {
                     onMyWorkProfileClick = {
                         startActivity(Intent(this@ProfileActivity, MyWorkProfileActivity::class.java))
                     },
+                    onOfficeAssetsClick = {
+                        startActivity(Intent(this@ProfileActivity, OfficeAssetsActivity::class.java))
+                    },
                     onChangePasswordClick = {
                         startActivity(Intent(this@ProfileActivity, ChangePasswordActivity::class.java))
                     }
