@@ -17,6 +17,9 @@ class ProfileActivity : ComponentActivity() {
                     onBackClick = { finish() },
                     onMyWorkProfileClick = {
                         startActivity(Intent(this@ProfileActivity, MyWorkProfileActivity::class.java))
+                    },
+                    onChangePasswordClick = {
+                        startActivity(Intent(this@ProfileActivity, ChangePasswordActivity::class.java))
                     }
                 )
             }

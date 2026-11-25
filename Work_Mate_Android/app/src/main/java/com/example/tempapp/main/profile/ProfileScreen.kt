@@ -52,7 +52,8 @@ private data class ProfileMenuItem(
 @Composable
 fun ProfileScreen(
     onBackClick: () -> Unit,
-    onMyWorkProfileClick: () -> Unit
+    onMyWorkProfileClick: () -> Unit,
+    onChangePasswordClick: () -> Unit
 ) {
     val accountItems = listOf(
         ProfileMenuItem("My Work Profile", R.drawable.person, onClick = onMyWorkProfileClick),
@@ -61,7 +62,7 @@ fun ProfileScreen(
         ProfileMenuItem("Roles", R.drawable.role)
     )
     val settingItems = listOf(
-        ProfileMenuItem("Change Password", R.drawable.setting),
+        ProfileMenuItem("Change Password", R.drawable.setting, onClick = onChangePasswordClick),
         ProfileMenuItem("Versioning", R.drawable.verson),
         ProfileMenuItem("FAQ and Help", R.drawable.faq),
         ProfileMenuItem("Logout", R.drawable.logout, isDestructive = true)

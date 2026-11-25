@@ -71,7 +71,8 @@ import com.example.tempapp.ui.theme.Purple600
 fun HomeScreen(
     showWelcomeInitially: Boolean,
     onMessagesClick: () -> Unit,
-    onNotificationsClick: () -> Unit
+    onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit
 ) {
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -96,7 +97,8 @@ fun HomeScreen(
             ) {
                 HomeHeader(
                     onMessagesClick = onMessagesClick,
-                    onNotificationsClick = onNotificationsClick
+                    onNotificationsClick = onNotificationsClick,
+                    onProfileClick = onProfileClick
                 )
                 Spacer(modifier = Modifier.height(18.dp))
                 WorkSummaryCard()
@@ -137,7 +139,8 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     onMessagesClick: () -> Unit,
-    onNotificationsClick: () -> Unit
+    onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -148,7 +151,8 @@ private fun HomeHeader(
         Box(
             modifier = Modifier
                 .size(46.dp)
-                .background(Purple100, CircleShape),
+                .background(Purple100, CircleShape)
+                .clickable(onClick = onProfileClick),
             contentAlignment = Alignment.Center
         ) {
             Text(text = "⌣", color = Purple500, fontSize = 25.sp, fontWeight = FontWeight.Bold)
