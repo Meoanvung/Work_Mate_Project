@@ -74,6 +74,27 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: null,
     },
+    // Authenticated password-change state is independent from signup and password reset flows.
+    passwordChangeOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordChangeOtpExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    passwordChangeAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+    },
+    passwordChangePendingPasswordHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -129,6 +129,43 @@ OTP hợp lệ trả `resetToken` one-time ngắn hạn cùng `expiresAt`. Token
 ```
 Hai password phải giống nhau và tuân theo rule ≥ 8 ký tự, gồm chữ và số. Thành công trả `200` nhưng không trả JWT; dùng mật khẩu mới để gọi `/api/auth/login`.
 
+### Password change (Change Password) 🔒
+Luồng này khớp UI Android: Current / New / Confirm Password → xác nhận cập nhật → OTP 6 số/resend → Password Updated. Mọi endpoint trong phần này yêu cầu header `Authorization: Bearer <JWT>`. Email nhận OTP luôn là email canonical của tài khoản xác định từ JWT; app không được gửi email đích trong request.
+
+#### `POST /api/auth/password-change/request`
+```json
+{
+  "currentPassword": "Password123",
+  "newPassword": "ChangedPassword123",
+  "confirmPassword": "ChangedPassword123"
+}
+```
+Server kiểm tra mật khẩu hiện tại, rule password mới (8–72 ký tự, có chữ và số) và hai trường password mới phải trùng nhau. Password mới phải khác password hiện tại. Thành công tạo OTP challenge, lưu **bcrypt hash** của password mới ở trạng thái pending và trả:
+```json
+{
+  "success": true,
+  "message": "Mã xác minh đổi mật khẩu đã được gửi đến email của bạn.",
+  "recipientEmail": "user@example.com",
+  "expiresAt": "2026-01-01T00:00:00.000Z"
+}
+```
+Chỉ mở sheet OTP khi response thành công. Mật khẩu plaintext, bcrypt hash và OTP không xuất hiện trong response.
+
+#### `POST /api/auth/password-change/resend`
+Không có body. Với Bearer JWT và một change-password challenge đang chờ xác minh, endpoint này gửi OTP mới đến `recipientEmail`, vô hiệu code cũ, reset số lần thử OTP nhưng giữ pending password hash. Nếu chưa có challenge, API trả `400` để app đưa người dùng về form Change Password.
+
+#### `POST /api/auth/password-change/verify`
+```json
+{ "otp": "123456" }
+```
+OTP hợp lệ mới commit password pending và xóa toàn bộ trạng thái change-password. Thành công trả:
+```json
+{ "success": true, "message": "Đổi mật khẩu thành công." }
+```
+Response không trả JWT mới; app dùng `200` để hiển thị sheet **Password Updated!**. OTP sai hoặc hết hạn trả `400`; vượt 5 lần thử sai trả `429`.
+
+> Lưu ý: JWT hiện tại là stateless, nên token đã phát hành vẫn dùng được tới khi hết hạn sau khi đổi password. Nếu sản phẩm cần đăng xuất toàn bộ thiết bị, hãy bổ sung cơ chế token/session version ở một thay đổi riêng.
+
 ### `GET /api/auth/me` 🔒
 Header: `Authorization: Bearer <JWT>` → trả về thông tin user.
 

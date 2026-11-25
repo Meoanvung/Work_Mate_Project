@@ -9,6 +9,9 @@ import {
   resendPasswordReset,
   verifyPasswordResetOtp,
   completePasswordReset,
+  requestPasswordChange,
+  resendPasswordChange,
+  verifyPasswordChange,
   me,
 } from '../controllers/authController.js';
 import { validate } from '../middleware/validate.js';
@@ -98,6 +101,13 @@ const confirmPasswordRule = body('confirmPassword')
     return true;
   });
 
+const currentPasswordRule = body('currentPassword')
+  .isString()
+  .withMessage('Mật khẩu hiện tại không hợp lệ')
+  .bail()
+  .notEmpty()
+  .withMessage('Mật khẩu hiện tại không được để trống');
+
 const resetTokenRule = body('resetToken')
   .isString()
   .withMessage('Yêu cầu đặt lại mật khẩu không hợp lệ')
@@ -116,7 +126,10 @@ router.post('/password-reset/resend', [emailRule, validate], resendPasswordReset
 router.post('/password-reset/verify', [emailRule, otpRule, validate], verifyPasswordResetOtp);
 router.post('/password-reset/complete', [resetTokenRule, newPasswordRule, confirmPasswordRule, validate], completePasswordReset);
 
-// Protected route (JWT)
+// Protected routes (JWT)
 router.get('/me', authenticate, me);
+router.post('/password-change/request', [authenticate, currentPasswordRule, newPasswordRule, confirmPasswordRule, validate], requestPasswordChange);
+router.post('/password-change/resend', authenticate, resendPasswordChange);
+router.post('/password-change/verify', [authenticate, otpRule, validate], verifyPasswordChange);
 
 export default router;

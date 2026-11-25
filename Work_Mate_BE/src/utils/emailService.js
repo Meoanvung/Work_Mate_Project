@@ -45,6 +45,28 @@ function buildPasswordResetOtpEmail(to, otp) {
   return { from: config.emailFrom, to, subject, text, html };
 }
 
+function buildPasswordChangeOtpEmail(to, otp) {
+  const minutes = config.otpTtlMinutes;
+  const subject = `[WorkMate] Mã xác nhận đổi mật khẩu: ${otp}`;
+  const text = [
+    `Xin chào,`,
+    ``,
+    `Mã OTP xác nhận đổi mật khẩu WorkMate của bạn là: ${otp}`,
+    `Mã có hiệu lực trong ${minutes} phút.`,
+    ``,
+    `Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này và kiểm tra bảo mật tài khoản.`,
+  ].join('\n');
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+      <h2 style="color:#111827;margin-bottom:8px">Xác nhận đổi mật khẩu WorkMate</h2>
+      <p style="color:#374151">Nhập mã bên dưới để xác nhận thay đổi mật khẩu tài khoản của bạn:</p>
+      <div style="font-size:32px;letter-spacing:8px;font-weight:bold;text-align:center;padding:16px;background:#f3f4f6;border-radius:8px;margin:16px 0">${otp}</div>
+      <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong ${minutes} phút. Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này.</p>
+    </div>`;
+
+  return { from: config.emailFrom, to, subject, text, html };
+}
+
 let cachedTransporter = null;
 
 async function getTransporter() {
@@ -110,6 +132,21 @@ export async function sendPasswordResetOtpEmail(to, otp) {
     console.log(`[email:console] To: ${to} | Subject: ${mail.subject}`);
     console.log(`[email:console] Password reset OTP for ${to} => ${otp}`);
     globalThis.__lastPasswordResetOtp = otp;
+    return { mode: 'console' };
+  }
+
+  const transporter = await getTransporter();
+  return transporter.sendMail(mail);
+}
+
+/** Send the OTP that confirms an authenticated password change. */
+export async function sendPasswordChangeOtpEmail(to, otp) {
+  const mail = buildPasswordChangeOtpEmail(to, otp);
+
+  if (config.emailProvider === 'console') {
+    console.log(`[email:console] To: ${to} | Subject: ${mail.subject}`);
+    console.log(`[email:console] Password change OTP for ${to} => ${otp}`);
+    globalThis.__lastPasswordChangeOtp = otp;
     return { mode: 'console' };
   }
 
