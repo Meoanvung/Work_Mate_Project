@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.tempapp.main.message.MessageActivity
 import com.example.tempapp.main.notification.NotificationActivity
+import com.example.tempapp.main.profile.ProfileActivity
 import com.example.tempapp.ui.theme.TempAppTheme
 
 class HomeActivity : ComponentActivity() {
@@ -22,6 +23,9 @@ class HomeActivity : ComponentActivity() {
                     },
                     onNotificationsClick = {
                         startActivity(Intent(this@HomeActivity, NotificationActivity::class.java))
+                    },
+                    onProfileClick = {
+                        startActivity(Intent(this@HomeActivity, ProfileActivity::class.java))
                     }
                 )
             }
