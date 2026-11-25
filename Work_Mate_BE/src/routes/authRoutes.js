@@ -12,6 +12,7 @@ import {
   requestPasswordChange,
   resendPasswordChange,
   verifyPasswordChange,
+  updateMyProfile,
   me,
 } from '../controllers/authController.js';
 import { validate } from '../middleware/validate.js';
@@ -116,6 +117,87 @@ const resetTokenRule = body('resetToken')
   .isLength({ min: 32, max: 256 })
   .withMessage('Yêu cầu đặt lại mật khẩu không hợp lệ');
 
+const PROFILE_FIELD_NAMES = [
+  'firstName',
+  'lastName',
+  'dateOfBirth',
+  'position',
+  'address',
+  'avatarUrl',
+];
+const ADDRESS_FIELD_NAMES = ['country', 'state', 'city', 'fullAddress'];
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/;
+
+const requiredProfileTextRule = (path, label, max) =>
+  body(path)
+    .isString()
+    .withMessage(`${label} không hợp lệ`)
+    .bail()
+    .custom((value) => {
+      const normalized = String(value).normalize('NFC').trim().replace(/\s+/g, ' ');
+      if (!normalized || normalized.length > max || CONTROL_CHARACTER_PATTERN.test(normalized)) {
+        throw new Error(`${label} phải có từ 1 đến ${max} ký tự`);
+      }
+      return true;
+    });
+
+const profilePayloadRule = body().custom((payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Dữ liệu profile không hợp lệ');
+  }
+
+  const unknownFields = Object.keys(payload).filter((key) => !PROFILE_FIELD_NAMES.includes(key));
+  if (unknownFields.length > 0) {
+    throw new Error(`Không được phép cập nhật field: ${unknownFields.join(', ')}`);
+  }
+
+  if (!payload.address || typeof payload.address !== 'object' || Array.isArray(payload.address)) {
+    throw new Error('Địa chỉ không hợp lệ');
+  }
+
+  const unknownAddressFields = Object.keys(payload.address).filter((key) => !ADDRESS_FIELD_NAMES.includes(key));
+  if (unknownAddressFields.length > 0) {
+    throw new Error(`Không được phép cập nhật field địa chỉ: ${unknownAddressFields.join(', ')}`);
+  }
+
+  return true;
+});
+
+const dateOfBirthRule = body('dateOfBirth').custom((value) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('Ngày sinh phải có định dạng YYYY-MM-DD');
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value || date.getTime() > Date.now()) {
+    throw new Error('Ngày sinh không hợp lệ');
+  }
+
+  return true;
+});
+
+const avatarUrlRule = body('avatarUrl').optional({ values: 'undefined' }).custom((value) => {
+  if (value === null) return true;
+  if (typeof value !== 'string' || value.length > 2048 || !/^https:\/\//i.test(value.trim())) {
+    throw new Error('Avatar URL phải là HTTPS URL hợp lệ');
+  }
+  return true;
+});
+
+const updateProfileRules = [
+  profilePayloadRule,
+  requiredProfileTextRule('firstName', 'Tên', 100),
+  requiredProfileTextRule('lastName', 'Họ', 100),
+  dateOfBirthRule,
+  requiredProfileTextRule('position', 'Vị trí', 120),
+  requiredProfileTextRule('address.country', 'Quốc gia', 100),
+  requiredProfileTextRule('address.state', 'Tỉnh/Bang', 100),
+  requiredProfileTextRule('address.city', 'Thành phố', 100),
+  requiredProfileTextRule('address.fullAddress', 'Địa chỉ đầy đủ', 500),
+  avatarUrlRule,
+  validate,
+];
+
 // Public routes
 router.post('/signup', [emailRule, phoneRule, companyIdRule, passwordRule, validate], signup);
 router.post('/verify-email-otp', [emailRule, otpRule, validate], verifyEmailOtp);
@@ -128,6 +210,7 @@ router.post('/password-reset/complete', [resetTokenRule, newPasswordRule, confir
 
 // Protected routes (JWT)
 router.get('/me', authenticate, me);
+router.patch('/me', [authenticate, ...updateProfileRules], updateMyProfile);
 router.post('/password-change/request', [authenticate, currentPasswordRule, newPasswordRule, confirmPasswordRule, validate], requestPasswordChange);
 router.post('/password-change/resend', authenticate, resendPasswordChange);
 router.post('/password-change/verify', [authenticate, otpRule, validate], verifyPasswordChange);

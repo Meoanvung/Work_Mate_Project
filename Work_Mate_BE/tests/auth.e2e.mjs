@@ -44,6 +44,13 @@ const postAuthorized = (path, token, body = {}) =>
     body: JSON.stringify(body),
   }).then(async (r) => ({ status: r.status, body: await r.json() }));
 
+const patchAuthorized = (path, token, body) =>
+  fetch(base + path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+
 try {
   // 1. Signup
   const signup = await post('/api/auth/signup', {
@@ -88,7 +95,76 @@ try {
     status: r.status,
     body: await r.json(),
   }));
-  check('/me with JWT returns the user', me.status === 200 && me.body.user?.email === 'test@example.com');
+  check(
+    '/me with JWT returns user and empty profile fields',
+    me.status === 200 && me.body.user?.email === 'test@example.com' && me.body.user?.firstName === null && me.body.user?.address?.country === null
+  );
+
+  const noAuthProfileUpdate = await fetch(`${base}/api/auth/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  check('profile update requires Bearer JWT (401)', noAuthProfileUpdate.status === 401);
+
+  const profilePayload = {
+    firstName: '  Tonald  ',
+    lastName: ' Drump ',
+    dateOfBirth: '1997-12-10',
+    position: ' Senior   Full Stack Developer ',
+    address: {
+      country: ' Indonesia ',
+      state: ' DKI Jakarta ',
+      city: ' Jakarta Selatan ',
+      fullAddress: ' Jl Mampang Prapatan XIV No 7A, Jakarta Selatan 12790 ',
+    },
+    avatarUrl: 'https://cdn.example.com/avatars/test.jpg',
+  };
+  const profileUpdate = await patchAuthorized('/api/auth/me', token, profilePayload);
+  check(
+    'profile update persists all Personal Data fields',
+    profileUpdate.status === 200 &&
+      profileUpdate.body.user?.firstName === 'Tonald' &&
+      profileUpdate.body.user?.position === 'Senior Full Stack Developer' &&
+      profileUpdate.body.user?.dateOfBirth === '1997-12-10' &&
+      profileUpdate.body.user?.address?.fullAddress === 'Jl Mampang Prapatan XIV No 7A, Jakarta Selatan 12790' &&
+      profileUpdate.body.user?.avatarUrl === profilePayload.avatarUrl
+  );
+
+  const persistedProfile = await fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(async (r) => ({
+    status: r.status,
+    body: await r.json(),
+  }));
+  check(
+    'profile data is returned by later GET /me',
+    persistedProfile.status === 200 && persistedProfile.body.user?.dateOfBirth === '1997-12-10' && persistedProfile.body.user?.address?.city === 'Jakarta Selatan'
+  );
+
+  const profileUpdateWithoutAvatar = { ...profilePayload };
+  delete profileUpdateWithoutAvatar.avatarUrl;
+  profileUpdateWithoutAvatar.position = 'Backend Engineer';
+  const profileWithoutAvatar = await patchAuthorized('/api/auth/me', token, profileUpdateWithoutAvatar);
+  check(
+    'profile update preserves avatar when avatarUrl is omitted',
+    profileWithoutAvatar.status === 200 &&
+      profileWithoutAvatar.body.user?.position === 'Backend Engineer' &&
+      profileWithoutAvatar.body.user?.avatarUrl === profilePayload.avatarUrl
+  );
+
+  const invalidProfileDate = await patchAuthorized('/api/auth/me', token, { ...profilePayload, dateOfBirth: '2030-01-01' });
+  check('future date of birth is rejected (400)', invalidProfileDate.status === 400 && Array.isArray(invalidProfileDate.body.errors));
+
+  const invalidProfileAvatar = await patchAuthorized('/api/auth/me', token, { ...profilePayload, avatarUrl: 'content://device/avatar.jpg' });
+  check('device-local avatar URL is rejected (400)', invalidProfileAvatar.status === 400 && Array.isArray(invalidProfileAvatar.body.errors));
+
+  const protectedProfileField = await patchAuthorized('/api/auth/me', token, { ...profilePayload, email: 'attacker@example.com' });
+  check('profile mass-assignment fields are rejected (400)', protectedProfileField.status === 400 && Array.isArray(protectedProfileField.body.errors));
+
+  const afterProtectedFieldAttempt = await fetch(`${base}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(async (r) => ({
+    status: r.status,
+    body: await r.json(),
+  }));
+  check('protected account identity remains unchanged', afterProtectedFieldAttempt.body.user?.email === 'test@example.com' && afterProtectedFieldAttempt.body.user?.companyId === 'COMP-001');
 
   const emailLogin = await post('/api/auth/login', { identifier: 'TEST@EXAMPLE.COM', password: 'Password123' });
   check('login by email identifier (200)', emailLogin.status === 200 && typeof emailLogin.body.token === 'string');
