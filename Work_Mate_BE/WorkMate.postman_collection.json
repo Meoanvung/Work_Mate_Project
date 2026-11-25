@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "WorkMate - Auth (Signup + OTP + JWT + Password Reset)",
-    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập / quên mật khẩu của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn\n- password: mật khẩu hiện tại (>=8 ký tự, có chữ + số)\n- otp: OTP xác thực signup\n- token: JWT tự động lưu sau khi verify signup hoặc login\n- reset_otp: OTP đặt lại mật khẩu (lấy từ email hoặc console server)\n- reset_token: token one-time tự lưu sau khi verify reset OTP\n- new_password: mật khẩu mới\n\nPassword reset theo UI Android: Request code -> Verify code -> Complete password reset -> Sign in lại bằng mật khẩu mới. Reset password không tự đăng nhập và không trả JWT.",
+    "name": "WorkMate - Auth (Signup + OTP + JWT + Password Reset + Change Password)",
+    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập / quên mật khẩu / đổi mật khẩu của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn\n- password: mật khẩu hiện tại (>=8 ký tự, có chữ + số)\n- otp: OTP xác thực signup\n- token: JWT tự động lưu sau khi verify signup hoặc login\n- reset_otp: OTP đặt lại mật khẩu (lấy từ email hoặc console server)\n- reset_token: token one-time tự lưu sau khi verify reset OTP\n- new_password: mật khẩu mới cho Forgot Password\n- current_password: mật khẩu hiện tại cho Change Password\n- change_new_password: mật khẩu mới cho Change Password\n- change_otp: OTP đổi mật khẩu (lấy từ email hoặc console server)\n\nPassword reset theo UI Android: Request code -> Verify code -> Complete password reset -> Sign in lại bằng mật khẩu mới. Reset password không tự đăng nhập và không trả JWT.\n\nChange password theo UI Android: Current/New/Confirm -> xác nhận trong app -> Request OTP -> Verify OTP -> Password Updated. Ba request đổi mật khẩu đều yêu cầu Bearer {{token}}; server tự lấy email nhận OTP từ tài khoản của JWT.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -103,6 +103,38 @@
         "url": { "raw": "{{base_url}}/api/auth/password-reset/complete", "host": ["{{base_url}}"], "path": ["api", "auth", "password-reset", "complete"] },
         "description": "Bước Set a New Password. Thành công chỉ báo hoàn thành; quay về Sign In và dùng mật khẩu mới để đăng nhập."
       }
+    },
+    {
+      "name": "11. Change password - Request verification code",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"{{current_password}}\",\n  \"newPassword\": \"{{change_new_password}}\",\n  \"confirmPassword\": \"{{change_new_password}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-change/request", "host": ["{{base_url}}"], "path": ["api", "auth", "password-change", "request"] },
+        "description": "Bước sau sheet xác nhận Update: server kiểm tra Current/New/Confirm, gửi OTP tới email của tài khoản JWT và trả recipientEmail/expiresAt. Không truyền email đích."
+      }
+    },
+    {
+      "name": "12. Change password - Resend code",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "url": { "raw": "{{base_url}}/api/auth/password-change/resend", "host": ["{{base_url}}"], "path": ["api", "auth", "password-change", "resend"] },
+        "description": "Khớp nút Resend it: xoay OTP, vô hiệu code trước đó và giữ password mới ở trạng thái pending."
+      }
+    },
+    {
+      "name": "13. Change password - Verify code",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\n  \"otp\": \"{{change_otp}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/password-change/verify", "host": ["{{base_url}}"], "path": ["api", "auth", "password-change", "verify"] },
+        "description": "OTP đúng mới commit mật khẩu mới. Thành công không trả JWT; dùng response 200 để mở sheet Password Updated."
+      }
     }
   ],
   "variable": [
@@ -113,6 +145,9 @@
     { "key": "token", "value": "" },
     { "key": "reset_otp", "value": "" },
     { "key": "reset_token", "value": "" },
-    { "key": "new_password", "value": "NewPassword123" }
+    { "key": "new_password", "value": "NewPassword123" },
+    { "key": "current_password", "value": "Password123" },
+    { "key": "change_new_password", "value": "ChangedPassword123" },
+    { "key": "change_otp", "value": "" }
   ]
 }

@@ -10,7 +10,7 @@ import {
   passwordResetTokenExpiryDate,
   MAX_OTP_ATTEMPTS,
 } from '../utils/otp.js';
-import { sendOtpEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
+import { sendOtpEmail, sendPasswordResetOtpEmail, sendPasswordChangeOtpEmail } from '../utils/emailService.js';
 import { signAuthToken } from '../utils/token.js';
 
 const SALT_ROUNDS = 10;
@@ -46,6 +46,24 @@ const passwordResetFields =
 const GENERIC_RESET_REQUEST_MESSAGE = 'Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.';
 const INVALID_RESET_OTP_MESSAGE = 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.';
 const INVALID_RESET_TOKEN_MESSAGE = 'Yêu cầu đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.';
+
+function clearPasswordChangeState(user) {
+  user.passwordChangeOtpHash = null;
+  user.passwordChangeOtpExpires = null;
+  user.passwordChangeAttempts = 0;
+  user.passwordChangePendingPasswordHash = null;
+}
+
+function attachPasswordChangeOtp(user, otp) {
+  user.passwordChangeOtpHash = hashOtp(otp);
+  user.passwordChangeOtpExpires = otpExpiryDate();
+  user.passwordChangeAttempts = 0;
+}
+
+const passwordChangeFields =
+  '+passwordChangeOtpHash +passwordChangeOtpExpires +passwordChangeAttempts ' +
+  '+passwordChangePendingPasswordHash';
+const INVALID_PASSWORD_CHANGE_OTP_MESSAGE = 'Mã xác minh đổi mật khẩu không hợp lệ hoặc đã hết hạn.';
 
 /**
  * POST /api/auth/signup
@@ -339,6 +357,140 @@ export async function completePasswordReset(req, res, next) {
       success: true,
       message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
     });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-change/request
+ * Body: { currentPassword, newPassword, confirmPassword }
+ * Requires a Bearer JWT and creates an email OTP challenge before committing the new password.
+ */
+export async function requestPasswordChange(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId).select(`+password ${passwordChangeFields}`);
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.' });
+    }
+
+    const isCurrentPasswordValid = await bcryptjs.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Mật khẩu hiện tại không chính xác.' });
+    }
+
+    const isSamePassword = await bcryptjs.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu mới phải khác mật khẩu hiện tại.' });
+    }
+
+    const salt = await bcryptjs.genSalt(SALT_ROUNDS);
+    const otp = generateOtp();
+    clearPasswordChangeState(user);
+    user.passwordChangePendingPasswordHash = await bcryptjs.hash(newPassword, salt);
+    attachPasswordChangeOtp(user, otp);
+    await user.save();
+    await sendPasswordChangeOtpEmail(user.email, otp);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Mã xác minh đổi mật khẩu đã được gửi đến email của bạn.',
+      recipientEmail: user.email,
+      expiresAt: user.passwordChangeOtpExpires,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-change/resend
+ * Rotates the OTP for the authenticated user's existing password-change request.
+ */
+export async function resendPasswordChange(req, res, next) {
+  try {
+    const user = await User.findById(req.userId).select(passwordChangeFields);
+
+    if (!user?.passwordChangePendingPasswordHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có yêu cầu đổi mật khẩu đang chờ xác minh. Vui lòng nhập lại thông tin đổi mật khẩu.',
+      });
+    }
+
+    const otp = generateOtp();
+    attachPasswordChangeOtp(user, otp);
+    await user.save();
+    await sendPasswordChangeOtpEmail(user.email, otp);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Mã xác minh đổi mật khẩu mới đã được gửi đến email của bạn.',
+      recipientEmail: user.email,
+      expiresAt: user.passwordChangeOtpExpires,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/auth/password-change/verify
+ * Body: { otp }
+ * Applies the staged password only after a valid OTP for the authenticated account.
+ */
+export async function verifyPasswordChange(req, res, next) {
+  try {
+    const otp = String(req.body.otp).trim();
+    const user = await User.findById(req.userId).select(passwordChangeFields);
+
+    if (!user?.passwordChangePendingPasswordHash || !user.passwordChangeOtpHash || !user.passwordChangeOtpExpires) {
+      return res.status(400).json({ success: false, message: INVALID_PASSWORD_CHANGE_OTP_MESSAGE });
+    }
+
+    if (user.passwordChangeOtpExpires.getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: INVALID_PASSWORD_CHANGE_OTP_MESSAGE });
+    }
+
+    if (user.passwordChangeAttempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: 'Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã OTP mới.',
+      });
+    }
+
+    if (!verifyOtpHash(otp, user.passwordChangeOtpHash)) {
+      user.passwordChangeAttempts += 1;
+      await user.save();
+      return res.status(400).json({ success: false, message: INVALID_PASSWORD_CHANGE_OTP_MESSAGE });
+    }
+
+    const consumed = await User.findOneAndUpdate(
+      {
+        _id: req.userId,
+        passwordChangeOtpHash: user.passwordChangeOtpHash,
+        passwordChangePendingPasswordHash: user.passwordChangePendingPasswordHash,
+        passwordChangeOtpExpires: { $gte: new Date() },
+      },
+      {
+        $set: {
+          password: user.passwordChangePendingPasswordHash,
+          passwordChangeOtpHash: null,
+          passwordChangeOtpExpires: null,
+          passwordChangeAttempts: 0,
+          passwordChangePendingPasswordHash: null,
+        },
+      },
+      { new: true }
+    );
+
+    if (!consumed) {
+      return res.status(400).json({ success: false, message: INVALID_PASSWORD_CHANGE_OTP_MESSAGE });
+    }
+
+    return res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công.' });
   } catch (err) {
     return next(err);
   }

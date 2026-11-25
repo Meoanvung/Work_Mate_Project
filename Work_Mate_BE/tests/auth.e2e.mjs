@@ -37,6 +37,13 @@ const post = (path, body) =>
     body: JSON.stringify(body),
   }).then(async (r) => ({ status: r.status, body: await r.json() }));
 
+const postAuthorized = (path, token, body = {}) =>
+  fetch(base + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+
 try {
   // 1. Signup
   const signup = await post('/api/auth/signup', {
@@ -156,7 +163,80 @@ try {
   const newPasswordLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'NewPassword123' });
   check('new password can sign in after reset (200)', newPasswordLogin.status === 200 && typeof newPasswordLogin.body.token === 'string');
 
-  // 8. Now verified -> duplicate signup blocked
+  // 8. Authenticated password change: form -> OTP/resend -> successful update.
+  const noAuthChangeRequest = await post('/api/auth/password-change/request', {
+    currentPassword: 'NewPassword123',
+    newPassword: 'ChangedPassword123',
+    confirmPassword: 'ChangedPassword123',
+  });
+  check('password change requires Bearer JWT (401)', noAuthChangeRequest.status === 401);
+
+  const changeToken = newPasswordLogin.body.token;
+  const wrongCurrentPassword = await postAuthorized('/api/auth/password-change/request', changeToken, {
+    currentPassword: 'WrongPassword123',
+    newPassword: 'ChangedPassword123',
+    confirmPassword: 'ChangedPassword123',
+  });
+  check('wrong current password rejected (401)', wrongCurrentPassword.status === 401);
+
+  const mismatchedChangePassword = await postAuthorized('/api/auth/password-change/request', changeToken, {
+    currentPassword: 'NewPassword123',
+    newPassword: 'ChangedPassword123',
+    confirmPassword: 'DifferentPassword123',
+  });
+  check('mismatched change passwords rejected (400)', mismatchedChangePassword.status === 400 && Array.isArray(mismatchedChangePassword.body.errors));
+
+  const sameChangePassword = await postAuthorized('/api/auth/password-change/request', changeToken, {
+    currentPassword: 'NewPassword123',
+    newPassword: 'NewPassword123',
+    confirmPassword: 'NewPassword123',
+  });
+  check('new password matching current password rejected (400)', sameChangePassword.status === 400);
+
+  const changeRequest = await postAuthorized('/api/auth/password-change/request', changeToken, {
+    currentPassword: 'NewPassword123',
+    newPassword: 'ChangedPassword123',
+    confirmPassword: 'ChangedPassword123',
+  });
+  check(
+    'password change request returns recipient and does not leak OTP',
+    changeRequest.status === 200 && changeRequest.body.recipientEmail === 'test@example.com' && !JSON.stringify(changeRequest.body).match(/\b\d{6}\b/)
+  );
+  const firstChangeOtp = globalThis.__lastPasswordChangeOtp;
+  check('password change OTP was sent in console mode', typeof firstChangeOtp === 'string' && firstChangeOtp.length === 6);
+
+  const changeResend = await postAuthorized('/api/auth/password-change/resend', changeToken);
+  const latestChangeOtp = globalThis.__lastPasswordChangeOtp;
+  check('password change resend succeeds', changeResend.status === 200 && changeResend.body.recipientEmail === 'test@example.com');
+
+  const oldChangeOtp = await postAuthorized('/api/auth/password-change/verify', changeToken, { otp: firstChangeOtp });
+  check('password change resend invalidates prior OTP', oldChangeOtp.status === 400);
+
+  const invalidChangeOtp = latestChangeOtp === '000000' ? '000001' : '000000';
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const invalidChangeAttempt = await postAuthorized('/api/auth/password-change/verify', changeToken, { otp: invalidChangeOtp });
+    check(`invalid password change OTP attempt ${attempt + 1} is rejected (400)`, invalidChangeAttempt.status === 400);
+  }
+  const changeOtpAttemptCap = await postAuthorized('/api/auth/password-change/verify', changeToken, { otp: invalidChangeOtp });
+  check('password change OTP attempt cap is enforced (429)', changeOtpAttemptCap.status === 429);
+
+  const changeResendAfterAttemptCap = await postAuthorized('/api/auth/password-change/resend', changeToken);
+  const finalChangeOtp = globalThis.__lastPasswordChangeOtp;
+  check('password change resend resets the OTP attempt cap', changeResendAfterAttemptCap.status === 200 && typeof finalChangeOtp === 'string' && finalChangeOtp.length === 6);
+
+  const changeVerify = await postAuthorized('/api/auth/password-change/verify', changeToken, { otp: finalChangeOtp });
+  check('password change verifies OTP without issuing JWT', changeVerify.status === 200 && !changeVerify.body.token && !changeVerify.body.user);
+
+  const reusedChangeOtp = await postAuthorized('/api/auth/password-change/verify', changeToken, { otp: finalChangeOtp });
+  check('used password change OTP is rejected (400)', reusedChangeOtp.status === 400);
+
+  const afterChangeOldPasswordLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'NewPassword123' });
+  check('pre-change password fails after password change (401)', afterChangeOldPasswordLogin.status === 401);
+
+  const afterChangeNewPasswordLogin = await post('/api/auth/login', { identifier: 'test@example.com', password: 'ChangedPassword123' });
+  check('changed password can sign in (200)', afterChangeNewPasswordLogin.status === 200 && typeof afterChangeNewPasswordLogin.body.token === 'string');
+
+  // 9. Now verified -> duplicate signup blocked
   const dup = await post('/api/auth/signup', {
     email: 'test@example.com',
     phoneNumber: '+84901234567',
@@ -173,7 +253,7 @@ try {
   });
   check('signup with normalized duplicate phone rejected (409)', duplicatePhone.status === 409);
 
-  // 9. Validation still works
+  // 10. Validation still works
   const invalid = await post('/api/auth/signup', { email: 'not-an-email', phoneNumber: 'abc', companyId: '', password: 'short' });
   check('invalid payload rejected (400)', invalid.status === 400 && Array.isArray(invalid.body.errors));
 } finally {
