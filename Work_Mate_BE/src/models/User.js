@@ -32,6 +32,39 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Personal Data is intentionally separate from account identifiers and authentication state.
+    firstName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    // A calendar-only date is saved at UTC midnight and serialized as YYYY-MM-DD.
+    dateOfBirth: {
+      type: Date,
+      default: null,
+    },
+    position: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    address: {
+      country: { type: String, trim: true, default: null },
+      state: { type: String, trim: true, default: null },
+      city: { type: String, trim: true, default: null },
+      fullAddress: { type: String, trim: true, default: null },
+    },
+    // This endpoint accepts only an HTTPS delivery URL; binary uploads use a separate future flow.
+    avatarUrl: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     // Email OTP verification data (HMAC-hashed OTP + expiry + brute-force guard)
     verificationOtpHash: {
       type: String,
@@ -99,6 +132,13 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+function formatCalendarDate(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 userSchema.methods.toPublicJSON = function toPublicJSON() {
   return {
     id: this._id,
@@ -106,6 +146,17 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     phoneNumber: this.phoneNumber,
     companyId: this.companyId,
     isVerified: this.isVerified,
+    firstName: this.firstName,
+    lastName: this.lastName,
+    dateOfBirth: formatCalendarDate(this.dateOfBirth),
+    position: this.position,
+    address: {
+      country: this.address?.country ?? null,
+      state: this.address?.state ?? null,
+      city: this.address?.city ?? null,
+      fullAddress: this.address?.fullAddress ?? null,
+    },
+    avatarUrl: this.avatarUrl,
     createdAt: this.createdAt,
   };
 };

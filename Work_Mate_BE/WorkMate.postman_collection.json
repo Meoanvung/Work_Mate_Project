@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "WorkMate - Auth (Signup + OTP + JWT + Password Reset + Change Password)",
-    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập / quên mật khẩu / đổi mật khẩu của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn\n- password: mật khẩu hiện tại (>=8 ký tự, có chữ + số)\n- otp: OTP xác thực signup\n- token: JWT tự động lưu sau khi verify signup hoặc login\n- reset_otp: OTP đặt lại mật khẩu (lấy từ email hoặc console server)\n- reset_token: token one-time tự lưu sau khi verify reset OTP\n- new_password: mật khẩu mới cho Forgot Password\n- current_password: mật khẩu hiện tại cho Change Password\n- change_new_password: mật khẩu mới cho Change Password\n- change_otp: OTP đổi mật khẩu (lấy từ email hoặc console server)\n\nPassword reset theo UI Android: Request code -> Verify code -> Complete password reset -> Sign in lại bằng mật khẩu mới. Reset password không tự đăng nhập và không trả JWT.\n\nChange password theo UI Android: Current/New/Confirm -> xác nhận trong app -> Request OTP -> Verify OTP -> Password Updated. Ba request đổi mật khẩu đều yêu cầu Bearer {{token}}; server tự lấy email nhận OTP từ tài khoản của JWT.",
+    "description": "Collection test API đăng ký / xác thực OTP / đăng nhập / quên mật khẩu / đổi mật khẩu / cập nhật profile của WorkMate BE.\n\nVariables (chỉnh trong tab Variables của collection):\n- base_url: http://localhost:5000\n- email: email của bạn\n- password: mật khẩu hiện tại (>=8 ký tự, có chữ + số)\n- otp: OTP xác thực signup\n- token: JWT tự động lưu sau khi verify signup hoặc login\n- reset_otp: OTP đặt lại mật khẩu (lấy từ email hoặc console server)\n- reset_token: token one-time tự lưu sau khi verify reset OTP\n- new_password: mật khẩu mới cho Forgot Password\n- current_password: mật khẩu hiện tại cho Change Password\n- change_new_password: mật khẩu mới cho Change Password\n- change_otp: OTP đổi mật khẩu (lấy từ email hoặc console server)\n- first_name, last_name, date_of_birth, position, country, state, city, full_address, avatar_url: Personal Data profile\n\nProfile update yêu cầu Bearer {{token}}. avatar_url chỉ nhận HTTPS URL hoặc null; không gửi Android content:// URI hay binary image.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -40,11 +40,23 @@
         "method": "GET",
         "header": [],
         "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
-        "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+        "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] },
+        "description": "Lấy account và Personal Data hiện tại. dateOfBirth trả về YYYY-MM-DD; profile field tài khoản mới có thể null."
       }
     },
     {
-      "name": "5. Login (đăng nhập)",
+      "name": "5. Update my Personal Data",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"{{first_name}}\",\n  \"lastName\": \"{{last_name}}\",\n  \"dateOfBirth\": \"{{date_of_birth}}\",\n  \"position\": \"{{position}}\",\n  \"address\": {\n    \"country\": \"{{country}}\",\n    \"state\": \"{{state}}\",\n    \"city\": \"{{city}}\",\n    \"fullAddress\": \"{{full_address}}\"\n  },\n  \"avatarUrl\": \"{{avatar_url}}\"\n}" },
+        "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] },
+        "description": "Personal Data form: request chỉ cập nhật chính user trong JWT. avatarUrl phải là HTTPS URL (hoặc thay bằng null để xóa)."
+      }
+    },
+    {
+      "name": "6. Login (đăng nhập)",
       "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('login returns 200', function () {", "  pm.expect(pm.response.code).to.eql(200);", "});", "const body = pm.response.json();", "if (body && body.token) {", "  pm.collectionVariables.set('token', body.token);", "}"] } }],
       "request": {
         "method": "POST",
@@ -146,6 +158,15 @@
     { "key": "reset_otp", "value": "" },
     { "key": "reset_token", "value": "" },
     { "key": "new_password", "value": "NewPassword123" },
+    { "key": "first_name", "value": "Tonald" },
+    { "key": "last_name", "value": "Drump" },
+    { "key": "date_of_birth", "value": "1997-12-10" },
+    { "key": "position", "value": "Junior Full Stack Developer" },
+    { "key": "country", "value": "Indonesia" },
+    { "key": "state", "value": "DKI Jakarta" },
+    { "key": "city", "value": "Jakarta Selatan" },
+    { "key": "full_address", "value": "Jl Mampang Prapatan XIV No 7A, Jakarta Selatan 12790" },
+    { "key": "avatar_url", "value": "https://cdn.example.com/avatars/you.jpg" },
     { "key": "current_password", "value": "Password123" },
     { "key": "change_new_password", "value": "ChangedPassword123" },
     { "key": "change_otp", "value": "" }

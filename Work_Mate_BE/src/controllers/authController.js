@@ -496,6 +496,41 @@ export async function verifyPasswordChange(req, res, next) {
   }
 }
 
+const normalizeProfileText = (value) => String(value).normalize('NFC').trim().replace(/\s+/g, ' ');
+
+/** PATCH /api/auth/me — updates the authenticated user's Personal Data fields only. */
+export async function updateMyProfile(req, res, next) {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
+
+    const { firstName, lastName, dateOfBirth, position, address, avatarUrl } = req.body;
+    user.firstName = normalizeProfileText(firstName);
+    user.lastName = normalizeProfileText(lastName);
+    // Date-only values are stored at UTC midnight to avoid a locale/timezone shift in MongoDB.
+    user.dateOfBirth = new Date(`${dateOfBirth}T00:00:00.000Z`);
+    user.position = normalizeProfileText(position);
+    user.address = {
+      country: normalizeProfileText(address.country),
+      state: normalizeProfileText(address.state),
+      city: normalizeProfileText(address.city),
+      fullAddress: normalizeProfileText(address.fullAddress),
+    };
+    if (Object.hasOwn(req.body, 'avatarUrl')) {
+      user.avatarUrl = avatarUrl === null ? null : normalizeProfileText(avatarUrl);
+    }
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật thông tin cá nhân thành công.',
+      user: user.toPublicJSON(),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 /** GET /api/auth/me — requires Bearer token */
 export async function me(req, res, next) {
   try {

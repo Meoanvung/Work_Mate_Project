@@ -166,8 +166,55 @@ Response không trả JWT mới; app dùng `200` để hiển thị sheet **Pass
 
 > Lưu ý: JWT hiện tại là stateless, nên token đã phát hành vẫn dùng được tới khi hết hạn sau khi đổi password. Nếu sản phẩm cần đăng xuất toàn bộ thiết bị, hãy bổ sung cơ chế token/session version ở một thay đổi riêng.
 
-### `GET /api/auth/me` 🔒
-Header: `Authorization: Bearer <JWT>` → trả về thông tin user.
+### Personal Data / Update Profile 🔒
+Các API profile khớp màn hình **My Work Profile** trên Android. Chúng luôn dùng header `Authorization: Bearer <JWT>` và chỉ đọc/ghi dữ liệu của chính chủ tài khoản JWT. Email, phone number, company ID, password và trạng thái xác thực không thể thay đổi ở luồng này.
+
+#### `GET /api/auth/me`
+Trả về thông tin account cùng Personal Data đã lưu. Các field profile của tài khoản mới là `null`.
+```json
+{
+  "success": true,
+  "user": {
+    "id": "...",
+    "email": "user@example.com",
+    "phoneNumber": "+84901234567",
+    "companyId": "COMP-001",
+    "firstName": "Tonald",
+    "lastName": "Drump",
+    "dateOfBirth": "1997-12-10",
+    "position": "Junior Full Stack Developer",
+    "address": {
+      "country": "Indonesia",
+      "state": "DKI Jakarta",
+      "city": "Jakarta Selatan",
+      "fullAddress": "Jl Mampang Prapatan XIV No 7A, Jakarta Selatan 12790"
+    },
+    "avatarUrl": "https://cdn.example.com/avatars/user.jpg"
+  }
+}
+```
+
+#### `PATCH /api/auth/me`
+Cập nhật đầy đủ dữ liệu Personal Data của UI:
+```json
+{
+  "firstName": "Tonald",
+  "lastName": "Drump",
+  "dateOfBirth": "1997-12-10",
+  "position": "Junior Full Stack Developer",
+  "address": {
+    "country": "Indonesia",
+    "state": "DKI Jakarta",
+    "city": "Jakarta Selatan",
+    "fullAddress": "Jl Mampang Prapatan XIV No 7A, Jakarta Selatan 12790"
+  },
+  "avatarUrl": "https://cdn.example.com/avatars/user.jpg"
+}
+```
+`dateOfBirth` bắt buộc dùng chuẩn `YYYY-MM-DD`, là ngày hợp lệ và không ở tương lai. Các text field được trim/chuẩn hóa phía server. `position` là text tự do có giới hạn độ dài; Country/State/City hiện dùng nhãn text từ UI, không bị ràng buộc theo danh sách hardcode Android.
+
+Thành công trả `200` cùng `user` canonical vừa lưu; Android chỉ hiện **Profile Updated** sau response này. `avatarUrl` là HTTPS URL hoặc `null`; không gửi `content://`, `file://`, raw image/base64. Upload file JPEG/PNG ≤5 MB đến object storage là luồng riêng, chưa thuộc endpoint này.
+
 
 ---
 
