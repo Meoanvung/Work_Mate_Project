@@ -1,6 +1,6 @@
 package com.example.tempapp.main.home
 
-import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -46,17 +44,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import com.example.tempapp.main.profile.ProfileActivity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tempapp.R
-import com.example.tempapp.ui.theme.Gray100
-import com.example.tempapp.ui.theme.Gray200
+import com.example.tempapp.main.attendant.AttendantScreen
+import com.example.tempapp.main.attendant.ClockInAreaScreen
+import com.example.tempapp.main.attendant.SelfiePreviewScreen
+import com.example.tempapp.main.navigation.MainBottomNavigation
+import com.example.tempapp.main.navigation.MainDestination
+import com.example.tempapp.main.profile.ProfileActivity
 import com.example.tempapp.ui.theme.Gray400
 import com.example.tempapp.ui.theme.Gray500
 import com.example.tempapp.ui.theme.Gray600
@@ -67,6 +67,12 @@ import com.example.tempapp.ui.theme.Purple300
 import com.example.tempapp.ui.theme.Purple500
 import com.example.tempapp.ui.theme.Purple600
 
+private enum class AttendancePage {
+    Overview,
+    ClockInArea,
+    SelfiePreview
+}
+
 @Composable
 fun HomeScreen(
     showWelcomeInitially: Boolean,
@@ -75,8 +81,25 @@ fun HomeScreen(
     onProfileClick: () -> Unit
 ) {
     val context = LocalContext.current
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedDestination by rememberSaveable { mutableStateOf(MainDestination.Home) }
     var showWelcome by rememberSaveable { mutableStateOf(showWelcomeInitially) }
+    var isClockedIn by rememberSaveable { mutableStateOf(false) }
+    var attendancePage by rememberSaveable { mutableStateOf(AttendancePage.Overview) }
+
+    BackHandler(enabled = selectedDestination != MainDestination.Home) {
+        if (selectedDestination == MainDestination.Calendar) {
+            attendancePage = when (attendancePage) {
+                AttendancePage.SelfiePreview -> AttendancePage.ClockInArea
+                AttendancePage.ClockInArea -> AttendancePage.Overview
+                AttendancePage.Overview -> {
+                    selectedDestination = MainDestination.Home
+                    AttendancePage.Overview
+                }
+            }
+        } else {
+            selectedDestination = MainDestination.Home
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -88,47 +111,40 @@ fun HomeScreen(
                 .fillMaxSize()
                 .then(if (showWelcome) Modifier.blur(7.dp) else Modifier)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                HomeHeader(
-                    onMessagesClick = onMessagesClick,
-                    onNotificationsClick = onNotificationsClick,
-                    onProfileClick = onProfileClick
+            Box(modifier = Modifier.weight(1f)) {
+                when (selectedDestination) {
+                    MainDestination.Calendar -> when (attendancePage) {
+                        AttendancePage.Overview -> AttendantScreen(
+                            isClockedIn = isClockedIn,
+                            onClockInNow = { attendancePage = AttendancePage.ClockInArea }
+                        )
+
+                        AttendancePage.ClockInArea -> ClockInAreaScreen(
+                            onBackClick = { attendancePage = AttendancePage.Overview },
+                            onSelfieToClockIn = { attendancePage = AttendancePage.SelfiePreview }
+                        )
+
+                        AttendancePage.SelfiePreview -> SelfiePreviewScreen(
+                            onBackClick = { attendancePage = AttendancePage.ClockInArea }
+                        )
+                    }
+
+                    else -> HomeContent(
+                        onMessagesClick = onMessagesClick,
+                        onNotificationsClick = onNotificationsClick,
+                        onProfileClick = onProfileClick
+                    )
+                }
+            }
+            if (selectedDestination != MainDestination.Calendar || attendancePage == AttendancePage.Overview) {
+                MainBottomNavigation(
+                    selectedDestination = selectedDestination,
+                    onDestinationSelected = { destination ->
+                        attendancePage = AttendancePage.Overview
+                        selectedDestination = destination
+                    }
                 )
             }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(Purple25)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-            ) {
-                Spacer(modifier = Modifier.height(18.dp))
-                WorkSummaryCard()
-                Spacer(modifier = Modifier.height(16.dp))
-                EmptyStateCard(
-                    title = "Today Meeting",
-                    subtitle = "Your schedule for the day",
-                    message = "No Meeting Available",
-                    description = "It looks like you don’t have any meetings scheduled at the moment.\nThis space will be updated as new meetings are added!",
-                    illustration = { MeetingIllustration() }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                EmptyStateCard(
-                    title = "Today Task",
-                    subtitle = "The tasks assigned to you for today",
-                    message = "No Tasks Assigned",
-                    description = "It looks like you don’t have any tasks assigned right now. Don’t worry, this space will be updated as new tasks become available.",
-                    illustration = { TaskIllustration() }
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-            BottomNavigationBar(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
         }
 
         if (showWelcome) {
@@ -136,10 +152,60 @@ fun HomeScreen(
                 onExplore = { showWelcome = false },
                 onSetUpProfile = {
                     showWelcome = false
-                    context.startActivity(Intent(context, ProfileActivity::class.java))
+                    context.startActivity(android.content.Intent(context, ProfileActivity::class.java))
                 },
                 onDismiss = { showWelcome = false }
             )
+        }
+    }
+}
+
+@Composable
+private fun HomeContent(
+    onMessagesClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            HomeHeader(
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .background(Purple25)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(18.dp))
+            WorkSummaryCard()
+            Spacer(modifier = Modifier.height(16.dp))
+            EmptyStateCard(
+                title = "Today Meeting",
+                subtitle = "Your schedule for the day",
+                message = "No Meeting Available",
+                description = "It looks like you don’t have any meetings scheduled at the moment.\nThis space will be updated as new meetings are added!",
+                illustration = { MeetingIllustration() }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            EmptyStateCard(
+                title = "Today Task",
+                subtitle = "The tasks assigned to you for today",
+                message = "No Tasks Assigned",
+                description = "It looks like you don’t have any tasks assigned right now. Don’t worry, this space will be updated as new tasks become available.",
+                illustration = { TaskIllustration() }
+            )
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
@@ -408,49 +474,6 @@ private fun TaskIllustration() {
                 .offset(y = 16.dp)
                 .size(width = 88.dp, height = 83.dp)
         )
-    }
-}
-
-private data class HomeNavItem(val label: String, val icon: Int, val selectedIcon: Int)
-
-@Composable
-private fun BottomNavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
-    val items = listOf(
-        HomeNavItem("Home", R.drawable.home, R.drawable.home_fill),
-        HomeNavItem("Calendar", R.drawable.calendar, R.drawable.calendar_fill),
-        HomeNavItem("Task", R.drawable.task, R.drawable.task_fill),
-        HomeNavItem("Leave", R.drawable.leave, R.drawable.leave_fill),
-        HomeNavItem("Expense", R.drawable.expense, R.drawable.expense_fill)
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF171B1C))
-            .navigationBarsPadding()
-            .padding(horizontal = 21.dp, vertical = 13.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        items.forEachIndexed { index, item ->
-            Column(
-                modifier = Modifier
-                    .size(43.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onTabSelected(index) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Image(
-                    painter = painterResource(if (selectedTab == index) item.selectedIcon else item.icon),
-                    contentDescription = item.label,
-                    modifier = Modifier.size(27.dp)
-                )
-                if (selectedTab == index) {
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Box(modifier = Modifier.width(16.dp).height(3.dp).background(Color.White, CircleShape))
-                }
-            }
-        }
     }
 }
 
