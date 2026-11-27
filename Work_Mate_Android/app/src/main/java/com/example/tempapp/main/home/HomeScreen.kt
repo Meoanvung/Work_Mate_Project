@@ -59,6 +59,7 @@ import com.example.tempapp.main.attendant.SelfiePreviewScreen
 import com.example.tempapp.main.navigation.MainBottomNavigation
 import com.example.tempapp.main.navigation.MainDestination
 import com.example.tempapp.main.profile.ProfileActivity
+import com.example.tempapp.main.task.TaskOverviewScreen
 import com.example.tempapp.ui.theme.Gray200
 import com.example.tempapp.ui.theme.Gray400
 import com.example.tempapp.ui.theme.Gray500
@@ -174,7 +175,9 @@ fun HomeScreen(
                         )
                     }
 
-                    else -> HomeContent(
+                    MainDestination.Task -> TaskOverviewScreen()
+
+                    MainDestination.Home -> HomeContent(
                         onMessagesClick = onMessagesClick,
                         onNotificationsClick = onNotificationsClick,
                         onProfileClick = onProfileClick

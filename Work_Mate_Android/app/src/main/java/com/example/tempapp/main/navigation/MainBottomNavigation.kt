@@ -27,7 +27,8 @@ import com.example.tempapp.R
 
 enum class MainDestination {
     Home,
-    Calendar
+    Calendar,
+    Task
 }
 
 private data class MainNavItem(
@@ -45,7 +46,7 @@ fun MainBottomNavigation(
     val items = listOf(
         MainNavItem(MainDestination.Home, "Home", R.drawable.home, R.drawable.home_fill),
         MainNavItem(MainDestination.Calendar, "Calendar", R.drawable.calendar, R.drawable.calendar_fill),
-        MainNavItem(null, "Task", R.drawable.task, R.drawable.task_fill),
+        MainNavItem(MainDestination.Task, "Task", R.drawable.task, R.drawable.task_fill),
         MainNavItem(null, "Leave", R.drawable.leave, R.drawable.leave_fill),
         MainNavItem(null, "Expense", R.drawable.expense, R.drawable.expense_fill)
     )
