@@ -51,8 +51,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tempapp.R
+import com.example.tempapp.main.attendant.AttendantDetailScreen
 import com.example.tempapp.main.attendant.AttendantScreen
 import com.example.tempapp.main.attendant.ClockInAreaScreen
+import com.example.tempapp.main.attendant.ClockInDetailScreen
 import com.example.tempapp.main.attendant.SelfiePreviewScreen
 import com.example.tempapp.main.navigation.MainBottomNavigation
 import com.example.tempapp.main.navigation.MainDestination
@@ -70,7 +72,9 @@ import com.example.tempapp.ui.theme.Purple600
 private enum class AttendancePage {
     Overview,
     ClockInArea,
-    SelfiePreview
+    SelfiePreview,
+    ClockInDetail,
+    AttendantDetail
 }
 
 @Composable
@@ -84,11 +88,21 @@ fun HomeScreen(
     var selectedDestination by rememberSaveable { mutableStateOf(MainDestination.Home) }
     var showWelcome by rememberSaveable { mutableStateOf(showWelcomeInitially) }
     var isClockedIn by rememberSaveable { mutableStateOf(false) }
+    var isOnBreak by rememberSaveable { mutableStateOf(false) }
+    var clockInNote by rememberSaveable { mutableStateOf("") }
+    var showClockInSuccess by rememberSaveable { mutableStateOf(false) }
+    var showHistoryExportSuccess by rememberSaveable { mutableStateOf(false) }
     var attendancePage by rememberSaveable { mutableStateOf(AttendancePage.Overview) }
 
-    BackHandler(enabled = selectedDestination != MainDestination.Home) {
-        if (selectedDestination == MainDestination.Calendar) {
+    BackHandler(enabled = selectedDestination != MainDestination.Home || showClockInSuccess || showHistoryExportSuccess) {
+        if (showHistoryExportSuccess) {
+            showHistoryExportSuccess = false
+        } else if (showClockInSuccess) {
+            showClockInSuccess = false
+        } else if (selectedDestination == MainDestination.Calendar) {
             attendancePage = when (attendancePage) {
+                AttendancePage.AttendantDetail -> AttendancePage.Overview
+                AttendancePage.ClockInDetail -> AttendancePage.SelfiePreview
                 AttendancePage.SelfiePreview -> AttendancePage.ClockInArea
                 AttendancePage.ClockInArea -> AttendancePage.Overview
                 AttendancePage.Overview -> {
@@ -109,14 +123,25 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (showWelcome) Modifier.blur(7.dp) else Modifier)
+                .then(if (showWelcome || showClockInSuccess || showHistoryExportSuccess) Modifier.blur(7.dp) else Modifier)
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedDestination) {
                     MainDestination.Calendar -> when (attendancePage) {
                         AttendancePage.Overview -> AttendantScreen(
                             isClockedIn = isClockedIn,
-                            onClockInNow = { attendancePage = AttendancePage.ClockInArea }
+                            isOnBreak = isOnBreak,
+                            onClockInNow = {
+                                clockInNote = ""
+                                isOnBreak = false
+                                attendancePage = AttendancePage.ClockInArea
+                            },
+                            onBreakClick = { isOnBreak = !isOnBreak },
+                            onClockOut = {
+                                isClockedIn = false
+                                isOnBreak = false
+                            },
+                            onHistoryClick = { attendancePage = AttendancePage.AttendantDetail }
                         )
 
                         AttendancePage.ClockInArea -> ClockInAreaScreen(
@@ -125,7 +150,21 @@ fun HomeScreen(
                         )
 
                         AttendancePage.SelfiePreview -> SelfiePreviewScreen(
-                            onBackClick = { attendancePage = AttendancePage.ClockInArea }
+                            onBackClick = { attendancePage = AttendancePage.ClockInArea },
+                            onShutterClick = { attendancePage = AttendancePage.ClockInDetail }
+                        )
+
+                        AttendancePage.ClockInDetail -> ClockInDetailScreen(
+                            note = clockInNote,
+                            onNoteChange = { clockInNote = it },
+                            onBackClick = { attendancePage = AttendancePage.SelfiePreview },
+                            onRetakePhoto = { attendancePage = AttendancePage.SelfiePreview },
+                            onClockIn = { showClockInSuccess = true }
+                        )
+
+                        AttendancePage.AttendantDetail -> AttendantDetailScreen(
+                            onBackClick = { attendancePage = AttendancePage.Overview },
+                            onExportClick = { showHistoryExportSuccess = true }
                         )
                     }
 
@@ -156,6 +195,23 @@ fun HomeScreen(
                 },
                 onDismiss = { showWelcome = false }
             )
+        }
+
+        if (showClockInSuccess) {
+            ClockInSuccessBottomSheet(
+                onDismiss = { showClockInSuccess = false },
+                onGoToClockInPage = {
+                    showClockInSuccess = false
+                    isClockedIn = true
+                    isOnBreak = false
+                    clockInNote = ""
+                    attendancePage = AttendancePage.Overview
+                }
+            )
+        }
+
+        if (showHistoryExportSuccess) {
+            ExportSuccessBottomSheet(onDismiss = { showHistoryExportSuccess = false })
         }
     }
 }
@@ -526,6 +582,97 @@ private fun WelcomeBottomSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClockInSuccessBottomSheet(
+    onDismiss: () -> Unit,
+    onGoToClockInPage: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(Brush.verticalGradient(listOf(Purple500, Purple600)), RoundedCornerShape(18.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✓", color = Color.White, fontSize = 42.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("Clock-In Successful!", color = Gray900, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Your clock-in has been recorded successfully. Have a productive day!",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(28.dp))
+            HomeGradientButton(text = "Go To Clock In Page", onClick = onGoToClockInPage)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExportSuccessBottomSheet(onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(Brush.verticalGradient(listOf(Purple500, Purple600)), RoundedCornerShape(18.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.export),
+                    contentDescription = null,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("Export As PDF Successful!", color = Gray900, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Your clock-in data has been exported as a PDF.\nYou can now download it.",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(28.dp))
+            HomeGradientButton(text = "Close Message", onClick = onDismiss, labelFontSize = 16.sp)
+        }
+    }
+}
+
 @Composable
 private fun WelcomeIllustration() {
     Box(
@@ -545,7 +692,11 @@ private fun WelcomeIllustration() {
 }
 
 @Composable
-private fun HomeGradientButton(text: String, onClick: () -> Unit) {
+private fun HomeGradientButton(
+    text: String,
+    onClick: () -> Unit,
+    labelFontSize: androidx.compose.ui.unit.TextUnit = 13.sp
+) {
     val shape = RoundedCornerShape(25.dp)
     Button(
         onClick = onClick,
@@ -557,6 +708,6 @@ private fun HomeGradientButton(text: String, onClick: () -> Unit) {
         Box(
             modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Purple500, Purple600)), shape),
             contentAlignment = Alignment.Center
-        ) { Text(text = text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
+        ) { Text(text = text, fontWeight = FontWeight.SemiBold, fontSize = labelFontSize) }
     }
 }
