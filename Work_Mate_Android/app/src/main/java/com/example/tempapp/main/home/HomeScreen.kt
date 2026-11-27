@@ -59,6 +59,7 @@ import com.example.tempapp.main.attendant.SelfiePreviewScreen
 import com.example.tempapp.main.navigation.MainBottomNavigation
 import com.example.tempapp.main.navigation.MainDestination
 import com.example.tempapp.main.profile.ProfileActivity
+import com.example.tempapp.ui.theme.Gray200
 import com.example.tempapp.ui.theme.Gray400
 import com.example.tempapp.ui.theme.Gray500
 import com.example.tempapp.ui.theme.Gray600
@@ -91,11 +92,18 @@ fun HomeScreen(
     var isOnBreak by rememberSaveable { mutableStateOf(false) }
     var clockInNote by rememberSaveable { mutableStateOf("") }
     var showClockInSuccess by rememberSaveable { mutableStateOf(false) }
+    var isClockedOutToday by rememberSaveable { mutableStateOf(false) }
+    var showClockOutConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showClockOutSuccess by rememberSaveable { mutableStateOf(false) }
     var showHistoryExportSuccess by rememberSaveable { mutableStateOf(false) }
     var attendancePage by rememberSaveable { mutableStateOf(AttendancePage.Overview) }
 
-    BackHandler(enabled = selectedDestination != MainDestination.Home || showClockInSuccess || showHistoryExportSuccess) {
-        if (showHistoryExportSuccess) {
+    BackHandler(enabled = selectedDestination != MainDestination.Home || showClockInSuccess || showClockOutConfirmation || showClockOutSuccess || showHistoryExportSuccess) {
+        if (showClockOutSuccess) {
+            showClockOutSuccess = false
+        } else if (showClockOutConfirmation) {
+            showClockOutConfirmation = false
+        } else if (showHistoryExportSuccess) {
             showHistoryExportSuccess = false
         } else if (showClockInSuccess) {
             showClockInSuccess = false
@@ -123,13 +131,14 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (showWelcome || showClockInSuccess || showHistoryExportSuccess) Modifier.blur(7.dp) else Modifier)
+                .then(if (showWelcome || showClockInSuccess || showClockOutConfirmation || showClockOutSuccess || showHistoryExportSuccess) Modifier.blur(7.dp) else Modifier)
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedDestination) {
                     MainDestination.Calendar -> when (attendancePage) {
                         AttendancePage.Overview -> AttendantScreen(
                             isClockedIn = isClockedIn,
+                            isClockedOutToday = isClockedOutToday,
                             isOnBreak = isOnBreak,
                             onClockInNow = {
                                 clockInNote = ""
@@ -137,10 +146,7 @@ fun HomeScreen(
                                 attendancePage = AttendancePage.ClockInArea
                             },
                             onBreakClick = { isOnBreak = !isOnBreak },
-                            onClockOut = {
-                                isClockedIn = false
-                                isOnBreak = false
-                            },
+                            onClockOut = { showClockOutConfirmation = true },
                             onHistoryClick = { attendancePage = AttendancePage.AttendantDetail }
                         )
 
@@ -186,8 +192,42 @@ fun HomeScreen(
             }
         }
 
-        if (showWelcome) {
-            WelcomeBottomSheet(
+        when {
+            showClockOutSuccess -> ClockOutSuccessBottomSheet(
+                onDismiss = {
+                    showClockOutSuccess = false
+                    attendancePage = AttendancePage.Overview
+                }
+            )
+
+            showClockOutConfirmation -> ClockOutConfirmationBottomSheet(
+                onDismiss = { showClockOutConfirmation = false },
+                onConfirm = {
+                    showClockOutConfirmation = false
+                    isClockedIn = false
+                    isOnBreak = false
+                    isClockedOutToday = true
+                    showClockOutSuccess = true
+                }
+            )
+
+            showHistoryExportSuccess -> ExportSuccessBottomSheet(
+                onDismiss = { showHistoryExportSuccess = false }
+            )
+
+            showClockInSuccess -> ClockInSuccessBottomSheet(
+                onDismiss = { showClockInSuccess = false },
+                onGoToClockInPage = {
+                    showClockInSuccess = false
+                    isClockedIn = true
+                    isClockedOutToday = false
+                    isOnBreak = false
+                    clockInNote = ""
+                    attendancePage = AttendancePage.Overview
+                }
+            )
+
+            showWelcome -> WelcomeBottomSheet(
                 onExplore = { showWelcome = false },
                 onSetUpProfile = {
                     showWelcome = false
@@ -195,23 +235,6 @@ fun HomeScreen(
                 },
                 onDismiss = { showWelcome = false }
             )
-        }
-
-        if (showClockInSuccess) {
-            ClockInSuccessBottomSheet(
-                onDismiss = { showClockInSuccess = false },
-                onGoToClockInPage = {
-                    showClockInSuccess = false
-                    isClockedIn = true
-                    isOnBreak = false
-                    clockInNote = ""
-                    attendancePage = AttendancePage.Overview
-                }
-            )
-        }
-
-        if (showHistoryExportSuccess) {
-            ExportSuccessBottomSheet(onDismiss = { showHistoryExportSuccess = false })
         }
     }
 }
@@ -578,6 +601,135 @@ private fun WelcomeBottomSheet(
             ) {
                 Text(text = "Explore The App First", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClockOutConfirmationBottomSheet(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 30.dp, vertical = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ClockOutIconTile()
+            Spacer(Modifier.height(22.dp))
+            Text("Confirm Clockout", color = Gray900, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Once you clock out, you won’t be able to edit this\ntime. Please double-check your hours before\nproceeding.",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(22.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ClockOutMetric("Today", "08:00:00 Hrs", Modifier.weight(1f))
+                ClockOutMetric("Overtime", "00:00:00 Hrs", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(24.dp))
+            HomeGradientButton(text = "Yes, Clock Out", onClick = onConfirm, labelFontSize = 15.sp)
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(25.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Purple500),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Purple500)
+            ) {
+                Text("No, Let me check", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClockOutIconTile() {
+    Box(
+        modifier = Modifier
+            .size(80.dp)
+            .background(Brush.verticalGradient(listOf(Purple500, Purple600)), RoundedCornerShape(18.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.time),
+            contentDescription = null,
+            modifier = Modifier.size(42.dp),
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
+        )
+    }
+}
+
+@Composable
+private fun ClockOutMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .height(76.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .border(1.dp, Gray200, RoundedCornerShape(9.dp))
+            .background(Color(0xFFFCFCFD))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(R.drawable.time),
+                contentDescription = null,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(label, color = Gray600, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(value, color = Gray900, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClockOutSuccessBottomSheet(onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = .52f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 30.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ClockOutIconTile()
+            Spacer(Modifier.height(22.dp))
+            Text("Clockout Successful!", color = Gray900, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "You’ve officially clocked out for the day. Thank you\nfor your hard work! Time to relax and enjoy your\nbreak.",
+                color = Gray600,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(26.dp))
+            HomeGradientButton(text = "Close Message", onClick = onDismiss, labelFontSize = 16.sp)
         }
     }
 }

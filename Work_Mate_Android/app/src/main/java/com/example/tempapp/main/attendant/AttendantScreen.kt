@@ -59,6 +59,7 @@ private val attendanceRecords = listOf(
 @Composable
 fun AttendantScreen(
     isClockedIn: Boolean,
+    isClockedOutToday: Boolean,
     isOnBreak: Boolean,
     onClockInNow: () -> Unit,
     onBreakClick: () -> Unit,
@@ -79,6 +80,7 @@ fun AttendantScreen(
             AttendantHero()
             WorkingHoursCard(
                 isClockedIn = isClockedIn,
+                isClockedOutToday = isClockedOutToday,
                 isOnBreak = isOnBreak,
                 onClockInNow = onClockInNow,
                 onBreakClick = onBreakClick,
@@ -145,6 +147,7 @@ private fun AttendantHero() {
 @Composable
 private fun WorkingHoursCard(
     isClockedIn: Boolean,
+    isClockedOutToday: Boolean,
     isOnBreak: Boolean,
     onClockInNow: () -> Unit,
     onBreakClick: () -> Unit,
@@ -176,8 +179,16 @@ private fun WorkingHoursCard(
             )
         }
         Spacer(Modifier.height(14.dp))
-        if (isClockedIn) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        when {
+            isClockedOutToday -> {
+                AttendantGradientButton(
+                    text = "Clocked Out Today",
+                    onClick = {},
+                    enabled = false
+                )
+            }
+
+            isClockedIn -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AttendantOutlineButton(
                     text = if (isOnBreak) "Resume Work" else "Take A Break",
                     onClick = onBreakClick,
@@ -190,8 +201,8 @@ private fun WorkingHoursCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-        } else {
-            AttendantGradientButton(
+
+            else -> AttendantGradientButton(
                 text = "Clock In Now",
                 onClick = onClockInNow,
                 enabled = true
