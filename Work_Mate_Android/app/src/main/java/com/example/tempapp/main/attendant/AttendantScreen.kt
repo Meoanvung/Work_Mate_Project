@@ -3,6 +3,7 @@ package com.example.tempapp.main.attendant
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,11 @@ private val attendanceRecords = listOf(
 @Composable
 fun AttendantScreen(
     isClockedIn: Boolean,
-    onClockInNow: () -> Unit
+    isOnBreak: Boolean,
+    onClockInNow: () -> Unit,
+    onBreakClick: () -> Unit,
+    onClockOut: () -> Unit,
+    onHistoryClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -74,7 +79,10 @@ fun AttendantScreen(
             AttendantHero()
             WorkingHoursCard(
                 isClockedIn = isClockedIn,
+                isOnBreak = isOnBreak,
                 onClockInNow = onClockInNow,
+                onBreakClick = onBreakClick,
+                onClockOut = onClockOut,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 20.dp)
@@ -88,7 +96,7 @@ fun AttendantScreen(
                 .padding(bottom = 20.dp)
         ) {
             attendanceRecords.forEachIndexed { index, record ->
-                AttendanceCard(record)
+                AttendanceCard(record, onClick = onHistoryClick)
                 if (index != attendanceRecords.lastIndex) Spacer(Modifier.height(16.dp))
             }
         }
@@ -137,7 +145,10 @@ private fun AttendantHero() {
 @Composable
 private fun WorkingHoursCard(
     isClockedIn: Boolean,
+    isOnBreak: Boolean,
     onClockInNow: () -> Unit,
+    onBreakClick: () -> Unit,
+    onClockOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -156,7 +167,7 @@ private fun WorkingHoursCard(
             HoursMetric(
                 modifier = Modifier.weight(1f),
                 label = "Today",
-                value = if (isClockedIn) "00:01 Hrs" else "00:00 Hrs"
+                value = if (isClockedIn) "04:10 Hrs" else "00:00 Hrs"
             )
             HoursMetric(
                 modifier = Modifier.weight(1f),
@@ -165,11 +176,27 @@ private fun WorkingHoursCard(
             )
         }
         Spacer(Modifier.height(14.dp))
-        AttendantGradientButton(
-            text = if (isClockedIn) "Clocked In" else "Clock In Now",
-            onClick = onClockInNow,
-            enabled = !isClockedIn
-        )
+        if (isClockedIn) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AttendantOutlineButton(
+                    text = if (isOnBreak) "Resume Work" else "Take A Break",
+                    onClick = onBreakClick,
+                    modifier = Modifier.weight(1f)
+                )
+                AttendantGradientButton(
+                    text = "Clock Out",
+                    onClick = onClockOut,
+                    enabled = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            AttendantGradientButton(
+                text = "Clock In Now",
+                onClick = onClockInNow,
+                enabled = true
+            )
+        }
     }
 }
 
@@ -198,12 +225,17 @@ private fun HoursMetric(modifier: Modifier, label: String, value: String) {
 }
 
 @Composable
-private fun AttendantGradientButton(text: String, onClick: () -> Unit, enabled: Boolean) {
+private fun AttendantGradientButton(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier
+) {
     val shape = RoundedCornerShape(27.dp)
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(52.dp),
         shape = shape,
@@ -231,12 +263,27 @@ private fun AttendantGradientButton(text: String, onClick: () -> Unit, enabled: 
 }
 
 @Composable
-private fun AttendanceCard(record: AttendanceRecord) {
+private fun AttendantOutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(52.dp),
+        shape = RoundedCornerShape(27.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Purple500),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Purple500),
+        contentPadding = PaddingValues(horizontal = 8.dp)
+    ) {
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AttendanceCard(record: AttendanceRecord, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
+            .clickable(onClick = onClick)
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

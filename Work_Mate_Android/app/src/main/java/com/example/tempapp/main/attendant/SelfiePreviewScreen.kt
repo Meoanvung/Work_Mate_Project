@@ -41,7 +41,10 @@ private val SkinColor = Color(0xFFD99B82)
 private val ShirtColor = Color(0xFF716578)
 
 @Composable
-fun SelfiePreviewScreen(onBackClick: () -> Unit) {
+fun SelfiePreviewScreen(
+    onBackClick: () -> Unit,
+    onShutterClick: () -> Unit
+) {
     var isFlashSelected by rememberSaveable { mutableStateOf(false) }
     var isZoomSelected by rememberSaveable { mutableStateOf(false) }
 
@@ -50,13 +53,14 @@ fun SelfiePreviewScreen(onBackClick: () -> Unit) {
             .fillMaxSize()
             .background(PreviewBackdrop)
     ) {
-        FauxFrontCameraPreview(Modifier.fillMaxSize())
+        StaticSelfiePortrait(Modifier.fillMaxSize())
         CameraTopBar(onBackClick = onBackClick)
         CameraCaptureBar(
             isFlashSelected = isFlashSelected,
             isZoomSelected = isZoomSelected,
             onFlashClick = { isFlashSelected = !isFlashSelected },
             onZoomClick = { isZoomSelected = !isZoomSelected },
+            onShutterClick = onShutterClick,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
@@ -108,7 +112,7 @@ private fun CameraTopControl(
 }
 
 @Composable
-private fun FauxFrontCameraPreview(modifier: Modifier = Modifier) {
+fun StaticSelfiePortrait(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         drawRect(PreviewBackdrop)
         drawRect(
@@ -189,6 +193,7 @@ private fun CameraCaptureBar(
     isZoomSelected: Boolean,
     onFlashClick: () -> Unit,
     onZoomClick: () -> Unit,
+    onShutterClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -213,7 +218,15 @@ private fun CameraCaptureBar(
                 .background(CameraBottomBar, CircleShape)
                 .padding(5.dp)
                 .background(Color.White, CircleShape)
-        )
+                .clickable(onClick = onShutterClick),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Text(
+                text = "",
+                color = Color.Transparent,
+                modifier = Modifier
+            )
+        }
         CircularCameraControl(
             label = "⚡",
             selected = isFlashSelected,
